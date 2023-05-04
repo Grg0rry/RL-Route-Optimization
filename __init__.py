@@ -8,6 +8,8 @@ import math
 sys.path.append('models/')
 import traffic_network
 import environment
+import agent
+
 
 def sumo_configuration():
     os.environ["SUMO_HOME"] = "D:/app/SUMO/SUMO/" # -- change to own directory
@@ -46,6 +48,8 @@ A == C == F =/= I == L == N
     """
     blocked_routes = ["gneE2", "-gneE2", "gneE6", "-gneE6", "gneE13", "-gneE13"]
     env = environment.traffic_env(network_file_directory, network_file, blocked_routes, route_map)
+    
+    # Activate Agent
     
 
     print(os.getcwd())
