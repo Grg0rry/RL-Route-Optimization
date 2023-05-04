@@ -5,16 +5,16 @@ import math
 
 
 class traffic_env:
-    def __init__ (self, network_folder, network_output_file, blocked_routes, route_map, route_start = "0", route_end = "3600", route_file = 'route.xml', route_output_file = 'routes.rou.xml', sumo_cfg_file = 'sumo_network.sumocfg'):
+    def __init__ (self, network_folder, network_output_file, blocked_routes, route_map, time_start = "0", time_end = "3600", route_file = 'route.xml', route_output_file = 'routes.rou.xml', sumo_cfg_file = 'sumo_network.sumocfg'):
         # Setup Route File
-        self.route_file_config(network_folder, route_start, route_end, blocked_routes, network_output_file, route_file, route_output_file, sumo_cfg_file)
+        self.route_file_config(network_folder, time_start, time_end, blocked_routes, network_output_file, route_file, route_output_file, sumo_cfg_file)
 
         # Define route nature
         self.blocked_routes = blocked_routes
-        self.route_map = route_map        
+        self.route_map = route_map
 
         # Parameters 
-        self.net = sumolib.net.readNet(network_output_file)
+        self.net = sumolib.net.readNet(os.path.join(network_folder,network_output_file))
         self.nodes = [node.getID().upper() for node in self.net.getNodes()]
         self.action_space = {0: 'Up', 1: 'Down', 2: 'Left', 3: 'Right'}
         self.state_space = [edge.getID() for edge in self.net.getEdges()] # List of edges
@@ -36,10 +36,10 @@ class traffic_env:
         """
 
         # Check if the nodes or edges are valid
-        if start not in self.nodes or start not in self.state_space:
-            raise ValueError('Error: Invalid Start Point!')
-        elif end not in self.nodes or end not in self.state_space:
-            raise ValueError('Error: Invalid End Point!')
+        if start not in self.nodes and start not in self.state_space:
+            sys.exit('Error: Invalid Start Point!')
+        elif end not in self.nodes and end not in self.state_space:
+            sys.exit('Error: Invalid End Point!')
         
         # Convert all Edges to Nodes for comparison
         if start_type == 'edge':
@@ -76,7 +76,7 @@ class traffic_env:
 
         # Check if the direction is valid
         if direction not in ('incoming', 'outgoing', None):
-            raise ValueError(f'Invalid direction: {direction}')
+            sys.exit(f'Invalid direction: {direction}')
     
         edges = []
         net_node = self.net.getNode(node)
@@ -124,10 +124,10 @@ class traffic_env:
             direction = math.atan2(end_y - start_y, end_x - start_x)
 
             # Convert the direction to degrees
-            direction_angle = math.degrees(direction)
+            direction_degrees = math.degrees(direction)
 
             # Normalize the angle to between 0 and 360
-            direction_degrees_ = (direction_degrees + 360) % 360
+            direction_degrees = (direction_degrees + 360) % 360
 
             # Get the degree boundary it falls in
             degree_boundary = int(round(direction_degrees / 90.0)) % 4
@@ -154,10 +154,10 @@ class traffic_env:
 
         # Check if state is in the State Space
         if state not in self.state_space:
-            raise ValueError('Error: State not in State Space!')
+            sys.exit('Error: State not in State Space!')
 
         # Determine the possible actions of the state
-        state_direction = self.decode_state_direction()
+        state_direction = self.decode_state_to_direction()
         serounding_states = [edge.getID() for edge in self.net.getEdge(state).getOutgoing().keys()]
 
         # Returns a list of actions
@@ -180,12 +180,12 @@ class traffic_env:
 
         # Check if state is in the State Space and action is in the Action Space
         if current_state not in self.state_space:
-            raise ValueError('Error: State not in State Space!')
+            sys.exit('Error: State not in State Space!')
         elif action not in [action for action in self.action_space]:
-            raise ValueError('Error: Action not in Action Space!')
+            sys.exit('Error: Action not in Action Space!')
 
         # Determine the possible directions of the current_state
-        state_direction = self.decode_state_direction()
+        state_direction = self.decode_state_to_direction()
         serounding_states = [edge.getID() for edge in self.net.getEdge(current_state).getOutgoing().keys()]
         
         # Match the direction with the action to determine the new state
@@ -243,7 +243,7 @@ class traffic_env:
         def route_SUMO_setup():
             try:
                 print(f"**Converting Route file to SUMO format --> {route_output_file} ...**")
-                os.system(f'duarouter --net-file={network_output_file} --route-file={route_file} --output-file={route_output_file}')
+                os.system(f"duarouter --net-file={network_output_file} --route-files={route_file} --output-file={route_output_file}")
                 print("**Convert Completed!**")
                 print("**Successfully Convert Route file to SUMO format**\n")
             except Exception as e:

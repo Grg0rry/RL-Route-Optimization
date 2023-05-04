@@ -50,9 +50,9 @@ A == C == F =/= I == L == N
     env = environment.traffic_env(network_file_directory, network_file, blocked_routes, route_map)
     
     # Activate Agent
-    
+    agent = agent.Q_Learning(env)
+    # agent = agent.SARSA(env)
+    agent.train(1000)
 
-    print(os.getcwd())
-    
 
 
