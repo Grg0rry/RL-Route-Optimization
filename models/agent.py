@@ -45,8 +45,8 @@ class agent:
             return response
 
         # Update class
-        self.start_node = "A" # node_response(nodes_lst, "Please Enter a Starting Point ==> ")
-        self.end_node =  "N" # node_response(nodes_lst, "Please Enter a Ending Point ==> ")
+        self.start_node = "B" #node_response(nodes_lst, "Please Enter a Starting Point ==> ")
+        self.end_node =  "N" #node_response(nodes_lst, "Please Enter a Ending Point ==> ")
         self.start_edges = self.env.decode_node_to_edge(self.start_node, 'outgoing')
         self.end_edges = self.env.decode_node_to_edge(self.end_node, 'incoming')
 
@@ -89,8 +89,8 @@ class agent:
         similar = 0
         self.reset()
         self.set_start_end()
-
         print('Training Started...')
+
         for episode in range(num_episodes):
             # Initialize state
             state = np.random.choice(self.start_edges)  # -- program chooses a random start edge if there are more than one
@@ -121,12 +121,12 @@ class agent:
             Threshold = 5
             if similar == Threshold:
                 print('Training Completed...')
-                print(f'Episode {episode}: {journey}')
+                print(f'Episode {episode}: {journey}\n')
                 break
             elif episode == num_episodes:
                 print('Training Completed...')
-                print(f'Couldnt find shortest path with {num_episodes} episodes')
-        return logs
+                print(f'Couldnt find shortest path with {num_episodes} episodes\n')
+        return logs, episode
 
 
 class SARSA(agent):

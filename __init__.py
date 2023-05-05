@@ -1,9 +1,7 @@
 import os, sys
 import traci
-import xml.etree.ElementTree as ET
 import sumolib
-import numpy as np
-import math
+import timeit
 
 sys.path.append('models/')
 import traffic_network
@@ -30,6 +28,24 @@ def sumo_configuration():
         print("SUMO version doesnt match with Traci")
 
 
+def sumo_simulation(network_file_directory, network_file, route):
+    traci.start(["sumo", "--net-file", os.path.join(network_file_directory,network_file)], traceFile="traci.log")
+
+    traci.route.add("Route", route)
+    vehicle_id = traci.vehicle.add("veh", "Route", typeID="car")
+    # traci.vehicle.setRoute(vehicle_id, "Route")
+
+    traci.simulation.start()
+    
+    time_travelled = traci.vehicle.getTravelTime(vehicle_id)
+    distance_travelled = traci.vehicle.getDistance(vehicle_id)
+
+    print("Time travelled: {} s".format(time_travelled))
+    print("Distance travelled: {} m".format(distance_travelled))
+
+    traci.close()
+
+
 if __name__ == '__main__':
     # Setting Up SUMO
     sumo_configuration()
@@ -50,9 +66,12 @@ A == C == F =/= I == L == N
     env = environment.traffic_env(network_file_directory, network_file, blocked_routes, route_map)
     
     # Activate Agent
-    agent = agent.Q_Learning(env)
-    # agent = agent.SARSA(env)
-    agent.train(1000)
+    Q_agent = agent.Q_Learning(env)
+    logs, episode = Q_agent.train(1000)
+    # sumo_simulation(network_file_directory, network_file, logs[episode])
+
+    S_agent = agent.SARSA(env)
+    logs, episode = S_agent.train(1000)
 
 
 
