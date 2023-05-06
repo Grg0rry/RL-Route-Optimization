@@ -68,12 +68,16 @@ A == C == F =/= I == L == N
     # cProfile.run('agent.Q_Learning(env).train(1000)')
 
     # Activate Agent
+    # for start_state in env.state_space:
+    #     for end_state in env.state_space:
+    #         Q_agent = agent.Q_Learning(env, start_state, end_state)
+    #         logs, episode = Q_agent.train(1000)
     Q_agent = agent.Q_Learning(env)
     logs, episode = Q_agent.train(1000)
     # sumo_simulation(network_file_directory, network_file, logs[episode])
 
-    # S_agent = agent.SARSA(env)
-    # logs, episode = S_agent.train(1000)
+    S_agent = agent.SARSA(env)
+    logs, episode = S_agent.train(1000)
 
 
 

@@ -1,4 +1,5 @@
 import numpy as np
+from collections import Counter
 
 
 class agent:
@@ -10,11 +11,13 @@ class agent:
         # Initialize environment
         self.env = env
         
+
     # Reset agent
     def reset(self):
         """ Complete reset agent """
         self.__init__(self.env)
-        self.start_node, self.end_node, self.start_edges, self.end_edges, self.action_space = self.env.set_start_end()
+        self.start_node, self.end_node, self.action_space = self.env.set_start_end()
+        #self.action_space = self.env.set_start_end(self.start_node, self.end_node)
         self.q_table = np.zeros((len(self.env.state_space), len(self.action_space)))
 
 
@@ -22,35 +25,39 @@ class agent:
         pass
 
 
-    def step(self, action, current_state):
+    def step(self, action, current_state, current_edge):
+        # initialize var
         terminate = False
         reward = 0
-        # print(f'state: {current_state}, action: {action}')
 
-        if action not in self.env.decode_state_to_actions(self.action_space, current_state): # -- out of bound
+        # Get list of outgoing edges     
+        outgoing_edges = self.env.decode_node_to_edge(current_state, direction = 'outgoing')
+
+        # Compute reward and next state
+        if action not in self.env.decode_edges_to_actions(self.action_space, outgoing_edges): # -- out of bound
             reward = -50
             next_state = current_state
+            next_edge = current_edge
         else:
-            next_state = self.env.decode_state_action_to_state(self.action_space, current_state, action)
-            if next_state in self.env.blocked_routes: # -- blocked_routes
+            next_edge = self.env.decode_edges_action_to_edge(self.action_space, outgoing_edges, action)
+            next_state = self.env.decode_edge_to_node(next_edge)
+
+            if next_edge in self.env.blocked_routes: # -- blocked_routes
                 reward = -50
                 terminate = True
-            elif next_state in self.end_edges: # -- completed
+            elif next_state in self.end_node: # -- completed
                 reward = 100
                 terminate = True
             else:
-                if current_state.replace("-", "") == next_state.replace("-", ""):
-                    reward = -50
-                elif self.env.state_direction[current_state] == self.env.state_direction[next_state]:
-                    reward = 50
-                elif self.env.get_distance(next_state, self.end_node, 'edge', 'node') < self.env.get_distance(current_state, self.end_node, 'edge', 'node'):
-                    reward = 50
+                if self.env.get_distance(next_state, self.end_node) < self.env.get_distance(current_state, self.end_node):
+                    reward = 0
+                elif current_edge != "":
+                    if self.env.edge_direction[current_edge] == self.env.edge_direction[next_edge]:
+                        reward += 50
+                    elif current_edge.replace("-", "") == next_edge.replace("-", ""):
+                        reward = -50
 
-            # else:
-            #     # get distance to completion
-            #     if self.env.get_distance(next_state, self.end_node, 'edge', 'node') < self.env.get_distance(current_state, self.end_node, 'edge', 'node'):
-            #         reward = 50 # Closer to end node      
-        return next_state, reward, terminate
+        return next_edge, next_state, reward, terminate
 
 
     def learn(self, current_state, action, next_state, reward):
@@ -62,74 +69,55 @@ class agent:
 
     def train(self, num_episodes):
         logs = {}
-        similar = 0
+        Threshold = 5
         self.reset()
         print('Training Started...')
 
         for episode in range(num_episodes):
             # Initialize state
-            
-
-            ## D
-            self.start_edges = ['-gneE10', 'gneE11']
-            ^       
-            np.argmax(self.q_table['gneE10'])
-            ^
-
-            ## G
-            self.start_edges = ['-gneE11', '-gneE16', 'gneE12']
-            ^       
-            np.argmax(self.q_table['gneE16'])
-            ^
-
-            ## C
-            self.start_edges = ['-gneE0', '-gneE5', 'gneE1', 'gneE10']
-
-
-            
-            index_list = [self.env.state_space.index(state) for state in self.start_edges]
-            arr = self.q_table[index_list]
-            max_value = np.max(arr)
-            max_row_index = np.where(arr == max_value)[0][0]
-            state = self.env.state_space[index_list[max_row_index]]
-
-
-            #state = np.random.choice(self.start_edges)
-            journey = [state]
+            state = self.start_node
+            edge = ""
+            state_journey = [state]
+            edge_journey = []
             terminate = False
-            # status = {prev_state: "", prev_action: None, curr_state: state, curr_action = None, next_state: "", next_state: None}
 
+            # Iterate till terminate
             while True:
-                if terminate or state in self.end_edges:
+                if terminate or state in self.end_node:
                     break
 
-                # Choose an action
                 action = self.act(state)
-                next_state, reward, terminate = self.step(action, state)
-                # print(f'state: {state}; reward: {reward}')
+                next_edge, next_state, reward, terminate = self.step(action, state, edge)
+                #print(f'curr --> state: {edge}, action: {action},\n next --> state: {next_edge}')
 
                 # Learn from the outcome
                 self.learn(state, action, next_state, reward)
                 
-                # Update state and action
+                # Update state
+                if state != next_state:
+                    edge_journey.append(next_edge)
+                    state_journey.append(next_state)
                 state = next_state
-                journey.append(state)
+                edge = next_edge
 
-            #print(self.q_table)
 
-            # Append to logs
-            logs[episode] = journey
-            print(f'{episode}: {journey}')
-            if episode > 0 and journey[-1] in self.end_edges:
-                if journey == logs[episode - 1]:
-                    similar += 1
+            # Append to logs and print after every episode
+            logs[episode] = [state_journey, edge_journey]
+            print(f'{episode}: {logs[episode]}')
 
-            Threshold = 5
-            if similar == Threshold:
-                print('Training Completed...')
-                print(f'Episode {episode}: {journey}\n')
-                break
-            elif episode == num_episodes:
+            # Compute Convergence
+            if episode > 0 and logs[episode][0][-1] == self.end_node:
+                
+                count_state_lst = Counter(tuple(state_lst[0]) for state_lst in logs.values())
+                journey = [list(state_lst) for state_lst, count in count_state_lst.items() if count == Threshold]
+                
+                if len(journey) != 0:
+                    print('Training Completed...\n')
+                    print(f'Episode {episode}: \n-- States: {logs[episode][0]} \n-- Edges: {logs[episode][1]}')
+                    break
+            
+            # Unable to converge
+            if episode == num_episodes:
                 print('Training Completed...')
                 print(f'Couldnt find shortest path with {num_episodes} episodes\n')
         return logs, episode
@@ -142,6 +130,8 @@ class SARSA(agent):
 
         # Define additional learning parameter
         self.exploration_rate = exploration_rate
+
+
 
 
     def act(self, state):

@@ -17,28 +17,35 @@ class traffic_env:
         self.net = sumolib.net.readNet(os.path.join(network_folder,network_output_file))
         self.nodes = [node.getID().upper() for node in self.net.getNodes()]
         self.edges = [edge.getID() for edge in self.net.getEdges()]
+        # self.action_space = initiated in agent.py
+        self.state_space = self.nodes
+        self.edge_direction = self.decode_edges_to_direction()
 
-        # Left to Right
-        # self.action_space = {0: 'Up', 1: 'Right', 2: 'Down', 3: 'Left'}
+
+    def set_action_space(self, directions): # Right
+        """ ... """
         
-        # Right to Left 
-        # self.action_space = {0: 'Left', 1: 'Up', 2: 'Right', 3: 'Down'}
+        if len(directions) == 2:
+            direction_dict = {
+                'Up' : 'Down',
+                'Down' : 'Up',
+                'Right' : 'Left',
+                'Left' : 'Right',
+            }
+            opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
+            reorder_list = directions
+            reorder_list.extend(opposite)
+        else:
+            general_directions = ['Up', 'Right', 'Down', 'Left']
+            if directions != []:
+                starting_index = general_directions.index(directions[0])
+                reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
+            else:
+                reorder_list = general_directions
 
-        self.state_space = edges
-        self.state_direction = self.decode_state_to_direction()
-
-
-    def set_action_space(self, direction):
-        general_directions = ['Up', 'Left', 'Down', 'Right']
-
-        starting_index = general_directions.index(direction)
-        reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
-        
         action_space = {}
-        for i in range(len(general_directions)):
+        for i in range(4):
             action_space[i] = reorder_list[i]
-        
-        print(action_space)
         return action_space
 
 
@@ -64,12 +71,10 @@ class traffic_env:
 
         start_node = node_response(nodes_lst, "Please Enter a Starting Point ==> ")
         end_node = node_response(nodes_lst, "Please Enter a Ending Point ==> ")
-        # start_node = "M"
-        # end_node = "B"
-        start_edges = self.decode_node_to_edge(start_node, 'outgoing')
-        end_edges = self.decode_node_to_edge(end_node, 'incoming')
+        #start_node = "I"
+        #end_node = "M"
         action_space = self.set_action_space(self.get_distance(start_node, end_node)[1])
-        return start_node, end_node, start_edges, end_edges, action_space
+        return start_node, end_node, action_space
 
 
     # Distance between two edges/nodes
@@ -88,9 +93,9 @@ class traffic_env:
         """
 
         # Check if the nodes or edges are valid
-        if start not in self.nodes and start not in self.state_space:
+        if start not in self.nodes and start not in self.edges:
             sys.exit('Error: Invalid Start Point!')
-        elif end not in self.nodes and end not in self.state_space:
+        elif end not in self.nodes and end not in self.edges:
             sys.exit('Error: Invalid End Point!')
         
         # Convert all Edges to Nodes for comparison
@@ -109,16 +114,19 @@ class traffic_env:
         distance = math.sqrt(dx**2 + dy**2)
 
         # Get the direction either Up, Down, Left or Right
-        if abs(dx) > abs(dy):
-            if dx > 0:
-                direction = 'Right'
-            else:
-                direction = 'Left'
-        else:
+        direction = []
+        if dy != 0:
             if dy > 0:
-                direction = 'Up'
+                direction.append('Up')
             else:
-                direction = 'Down'
+                direction.append('Down')
+
+        if dx != 0:
+            if dx > 0:
+                direction.append('Right')
+            else:
+                direction.append('Left')
+        
         return distance, direction
 
 
@@ -164,10 +172,10 @@ class traffic_env:
         if not edges:
             print(f'No edges found for node {node}')
         return edges
+    
 
-
-    # Find the direction from a given state
-    def decode_state_to_direction(self):
+    # Find the direction from a given edge
+    def decode_edges_to_direction(self):
         """
         Iterates through the whole state space and returns a dictionary of each state and the direction it is headed.
 
@@ -175,11 +183,11 @@ class traffic_env:
         - A dictionary of states (str) matched with its direction.
         """
 
-        state_direction = {}
-        def get_state_direction(state):
+        edge_direction = {}
+        def get_edge_direction(edge):
             # Find the direction and angle between two nodes to determine the edge direction
-            start_node = self.net.getEdge(state).getFromNode().getID()
-            end_node = self.net.getEdge(state).getToNode().getID()
+            start_node = self.net.getEdge(edge).getFromNode().getID()
+            end_node = self.net.getEdge(edge).getToNode().getID()
 
             start_x, start_y = self.net.getNode(start_node).getCoord()
             end_x, end_y = self.net.getNode(end_node).getCoord()
@@ -201,70 +209,91 @@ class traffic_env:
                 return 'Down'
         
         # Iterate through every state in the state space and compute its direction
-        for state in self.state_space:
-            state_direction[state] = get_state_direction(state)
-        return state_direction
+        for edge in self.edges:
+            edge_direction[edge] = get_edge_direction(edge)
+        return edge_direction
 
 
-    # Find available actions from a given state
-    def decode_state_to_actions(self, action_space, state):
-        """
-        Calls `decode_state_direction` to determine the direction of the given state. 
-        Returns a list of available actions from that given state.
+    # ...
+    def decode_edges_to_actions(self, action_space, edges):
+        """" ... """
 
-        Args:
-        - state (str): The ID of the state (edge)
+        # Check if edges is in the edges list
+        for edge in edges:
+            if edge not in self.edges:
+                sys.exit(f'Error: Edge {edge} not in Edges Space!')
 
-        Returns:
-        - A list of actions (int)
-        """
-
-        # Check if state is in the State Space
-        if state not in self.state_space:
-            sys.exit('Error: State not in State Space!')
-
-        # Determine the possible actions of the state
-        state_direction = self.state_direction # self.decode_state_to_direction()
-        serounding_states = [edge.getID() for edge in self.net.getEdge(state).getOutgoing().keys()]
+        # Get the direction of each edge
+        edge_direction = self.edge_direction
 
         # Returns a list of actions
         actions_lst = []
         for action, direction in action_space.items():
-            if direction in [state_direction[state_i] for state_i in serounding_states]:
+            if direction in [edge_direction[edge] for edge in edges]:
                 actions_lst.append(action)
         return actions_lst
 
 
-    # Find the new state from a given state and action
-    def decode_state_action_to_state(self, action_space, current_state, action):
-        """
-        Calls `decode_state_direction` to determine the new state given the current_state and action taken.
+    # ...
+    def decode_edges_action_to_edge(self, action_space, edges, action):
+        """ action (int): """
         
-        Args:
-        - current_state (str): The ID of the current state (edge).
-        - action (int): The action taken from the current state.
+        # Check if edges is in the edges list
+        for edge in edges:
+            if edge not in self.edges:
+                sys.exit(f'Error: Edge {edge} not in Edges Space!')
 
-        Returns:
-        - The new state (str) or None if no match is found.
-        """
-
-        # Check if state is in the State Space and action is in the Action Space
-        if current_state not in self.state_space:
-            sys.exit('Error: State not in State Space!')
-        elif action not in [action for action in action_space]:
-            sys.exit('Error: Action not in Action Space!')
-
-        # Determine the possible directions of the current_state
-        state_direction = self.state_direction # self.decode_state_to_direction()
-        serounding_states = [edge.getID() for edge in self.net.getEdge(current_state).getOutgoing().keys()]
+        # Get the direction of each edge
+        edge_direction = self.edge_direction
         
-        # Match the direction with the action to determine the new state
-        for state, direction in state_direction.items():
-            if state in serounding_states:
-                if direction == action_space[action]:
-                    # print(f'current_state: {current_state}, state_space: {serounding_states}, action": {action_space[action]}, state: {state}\n')
-                    return state
+        for edge in edges:
+            if edge_direction[edge] == action_space[action]:
+                return edge
         return None
+    
+
+    # ...
+    def decode_edge_to_node(self, search_edge):
+        """" ... """
+
+        # Check if edges is in the edges list
+        if search_edge not in self.edges:
+            sys.exit('Error: Edge not in Edges Space!')
+
+        edge = self.net.getEdge(search_edge)
+        return edge.getToNode().getID()
+
+
+    # # Find the new state from a given state and action
+    # def decode_state_action_to_state(self, action_space, current_state, action):
+    #     """
+    #     Calls `decode_state_direction` to determine the new state given the current_state and action taken.
+        
+    #     Args:
+    #     - current_state (str): The ID of the current state (edge).
+    #     - action (int): The action taken from the current state.
+
+    #     Returns:
+    #     - The new state (str) or None if no match is found.
+    #     """
+
+    #     # Check if state is in the State Space and action is in the Action Space
+    #     if current_state not in self.state_space:
+    #         sys.exit('Error: State not in State Space!')
+    #     elif action not in [action for action in action_space]:
+    #         sys.exit('Error: Action not in Action Space!')
+
+    #     # Determine the possible directions of the current_state
+    #     state_direction = self.state_direction # self.decode_state_to_direction()
+    #     serounding_states = [edge.getID() for edge in self.net.getEdge(current_state).getOutgoing().keys()]
+        
+    #     # Match the direction with the action to determine the new state
+    #     for state, direction in state_direction.items():
+    #         if state in serounding_states:
+    #             if direction == action_space[action]:
+    #                 # print(f'current_state: {current_state}, state_space: {serounding_states}, action": {action_space[action]}, state: {state}\n')
+    #                 return state
+    #     return None
 
 
     # Configure Route File
