@@ -1,7 +1,7 @@
 import os, sys
 import traci
 import sumolib
-import timeit
+import cProfile
 
 sys.path.append('models/')
 import traffic_network
@@ -65,13 +65,15 @@ A == C == F =/= I == L == N
     blocked_routes = ["gneE2", "-gneE2", "gneE6", "-gneE6", "gneE13", "-gneE13"]
     env = environment.traffic_env(network_file_directory, network_file, blocked_routes, route_map)
     
+    # cProfile.run('agent.Q_Learning(env).train(1000)')
+
     # Activate Agent
     Q_agent = agent.Q_Learning(env)
     logs, episode = Q_agent.train(1000)
     # sumo_simulation(network_file_directory, network_file, logs[episode])
 
-    S_agent = agent.SARSA(env)
-    logs, episode = S_agent.train(1000)
+    # S_agent = agent.SARSA(env)
+    # logs, episode = S_agent.train(1000)
 
 
 
