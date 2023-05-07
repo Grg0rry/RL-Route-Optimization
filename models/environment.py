@@ -122,7 +122,7 @@ class traffic_env:
 
 
     # Match node to edges
-    def decode_node_to_edge(self, node, direction = None):
+    def decode_node_to_edges(self, node, direction = None):
         """
         Given a node and direction, returns a list of edges associated with that node.
 

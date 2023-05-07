@@ -1,12 +1,15 @@
 import os, sys
 import traci
 import sumolib
-import cProfile
+import datetime
 
 sys.path.append('models/')
 import traffic_network
 import environment
 import agent
+
+sys.path.append('tests/')
+import evaluation
 
 
 def sumo_configuration():
@@ -22,7 +25,7 @@ def sumo_configuration():
     # Check versioning
     sumo_version = os.popen("sumo --version").read().strip()
     traci_version = os.popen("pip show traci --version").read().strip()
-    if sumo_version == traci_version:
+    # if sumo_version == traci_version:
         # "The versions match."
 
 
@@ -54,7 +57,7 @@ if __name__ == '__main__':
 
     # Setting up Traffic Route Environment
     blocked_routes = ["gneE2", "-gneE2", "gneE6", "-gneE6", "gneE13", "-gneE13"]
-    traffic_network.route_file_config(network_folder, network_file, blocked_routes)
+    traffic_network.route_file_config(network_file_directory, network_file, blocked_routes)
 
     # Initiate Environment
     env = environment.traffic_env(network_file_directory, network_file, blocked_routes)
@@ -70,11 +73,27 @@ if __name__ == '__main__':
         |     |     |    |
         D ==  G == J =/= M
     """
-    Q_agent = agent.Q_Learning(env, start_node = "A", end_node = "B")
-    logs, episode = Q_agent.train(1000)
+    start_node = "N"
+    end_node = "A"
+    
+    start = datetime.datetime.now()
+    D_agent = agent.Dijkstra(env, start_node, end_node)
+    node_path, edge_path = D_agent.search()
+    end = datetime.datetime.now()
+    print(f'time taken: {end - start}')
 
-    S_agent = agent.SARSA(env, start_node = "A", end_node = "B")
-    logs, episode = S_agent.train(1000)
+    start = datetime.datetime.now()
+    Q_agent = agent.Q_Learning(env, start_node, end_node)
+    node_path, edge_path, *_ = Q_agent.train(1000, 5)
+    end = datetime.datetime.now()
+    print(f'time taken: {end - start}')
 
+    start = datetime.datetime.now()
+    S_agent = agent.SARSA(env, start_node, end_node)
+    node_path, edge_path, *_ = S_agent.train(1000, 5)
+    end = datetime.datetime.now()
+    print(f'time taken: {end - start}')
 
+    # Evaluate Model Performance
+    # evaluation.funct()
 
