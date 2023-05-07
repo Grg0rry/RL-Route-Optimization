@@ -17,6 +17,8 @@ def network_file_config(network_folder, node_file = 'nodes.nod.xml', edge_file =
     """
 
     # Change directory to store files
+    if not os.path.exists(network_folder):
+        os.mkdir(network_folder)
     os.chdir(network_folder)
 
     def nodes_setup():
@@ -143,6 +145,8 @@ def route_file_config(network_folder, network_output_file, blocked_routes, time_
     """
 
     # Change directory to store files
+    if not os.path.exists(network_folder):
+        os.mkdir(network_folder)
     os.chdir(network_folder)
 
     # Create XML document for routes
