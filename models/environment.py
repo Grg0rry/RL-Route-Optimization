@@ -5,13 +5,9 @@ import math
 
 
 class traffic_env:
-    def __init__ (self, network_folder, network_output_file, blocked_routes, route_map, time_start = "0", time_end = "3600", route_file = 'route.xml', route_output_file = 'routes.rou.xml', sumo_cfg_file = 'sumo_network.sumocfg'):
-        # Setup Route File
-        self.route_file_config(network_folder, time_start, time_end, blocked_routes, network_output_file, route_file, route_output_file, sumo_cfg_file)
-
+    def __init__ (self, network_folder, network_output_file, blocked_routes):
         # Define route nature
         self.blocked_routes = blocked_routes
-        self.route_map = route_map
 
         # Parameters 
         self.net = sumolib.net.readNet(os.path.join(network_folder,network_output_file))
@@ -22,65 +18,61 @@ class traffic_env:
         self.edge_direction = self.decode_edges_to_direction()
 
 
-    def set_action_space(self, directions): # Right
-        """ ... """
-        
-        if len(directions) == 2:
-            direction_dict = {
-                'Up' : 'Down',
-                'Down' : 'Up',
-                'Right' : 'Left',
-                'Left' : 'Right',
-            }
-            opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
-            reorder_list = directions
-            reorder_list.extend(opposite)
-        else:
-            general_directions = ['Up', 'Right', 'Down', 'Left']
-            if directions != []:
-                starting_index = general_directions.index(directions[0])
-                reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
-            else:
-                reorder_list = general_directions
+    def set_action_space(self, directions):
+        """
+        Adjust the action_space according to the direction of the start and end node
 
-        action_space = {}
-        for i in range(4):
-            action_space[i] = reorder_list[i]
+        Args:
+        - directions (list): The direction of the start node to the end node. Either only
+        one direction or two like Down, Right or only Down
+        
+        Returns:
+        - A directionary of the action_space
+        """
+        
+        # Define the clockwise rotation of directions
+        direction_dict = {'Up': 'Down', 'Right': 'Left', 'Down': 'Up', 'Left': 'Right'}
+        general_directions = list(direction_dict.keys())
+
+        # Sort the general direction list with the directions given
+        if len(directions) == 1:
+            starting_index = general_directions.index(directions[0])
+            reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
+        elif len(directions) == 2:
+            opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
+            reorder_list = directions + opposite
+        else:
+            reorder_list = general_directions
+
+        # Returns action space
+        action_space = {i: reorder_list[i] for i in range(len(reorder_list))}
         return action_space
 
 
     # Set starting and ending nodes
-    def set_start_end(self):
+    def set_start_end(self, start_node, end_node):
         """
-        Receive user input to set the Starting and Ending Nodes for the route
+        Validates the input starting and ending node and calls the 'set_action_space'
+        then returns the action space with it
 
         Returns:
-        - None
+        - A dictionary of the action_space
         """
         
-        nodes_lst = self.nodes
+        # Check if the nodes are valid
+        if start_node not in self.nodes:
+            sys.exit('Error: Invalid Start Node!')
+        elif end_node not in self.nodes:
+            sys.exit('Error: Invalid End Node!')
 
-        # Receive Input from User to select starting and ending Nodes
-        def node_response(nodes_lst, prompt):
-            print(self.route_map)
-            response = input(prompt).upper()
-            if response not in nodes_lst:
-                print("Invalid node!!!")
-                return node_response(nodes_lst, prompt)
-            return response
-
-        start_node = node_response(nodes_lst, "Please Enter a Starting Point ==> ")
-        end_node = node_response(nodes_lst, "Please Enter a Ending Point ==> ")
-        #start_node = "I"
-        #end_node = "M"
         action_space = self.set_action_space(self.get_distance(start_node, end_node)[1])
-        return start_node, end_node, action_space
+        return action_space
 
 
     # Distance between two edges/nodes
     def get_distance(self, start, end, start_type = 'node', end_type = 'node'):
         """
-        Given a start and end point (node or edge), returns the distance between them
+        Given a start and end point (node or edge), returns the distance and direction between them.
 
         Args:
         - start (str): The ID of the starting point
@@ -89,7 +81,7 @@ class traffic_env:
         - end_type (str): The type of the ending point (node or edge)
 
         Returns:
-        - Distance between the two points
+        - A tuple of Distance (int) and Direction (list) between the two points 
         """
 
         # Check if the nodes or edges are valid
@@ -109,28 +101,27 @@ class traffic_env:
         end_x, end_y = self.net.getNode(end).getCoord()
 
         # Calculates the distance
-        dx = end_x - start_x
-        dy = end_y - start_y
-        distance = math.sqrt(dx**2 + dy**2)
+        x_diff = end_x - start_x
+        y_diff = end_y - start_y
+        distance = math.sqrt(x_diff**2 + y_diff**2)
 
         # Get the direction either Up, Down, Left or Right
         direction = []
-        if dy != 0:
-            if dy > 0:
+        if y_diff != 0:
+            if y_diff > 0:
                 direction.append('Up')
             else:
                 direction.append('Down')
 
-        if dx != 0:
-            if dx > 0:
+        if x_diff != 0:
+            if x_diff > 0:
                 direction.append('Right')
             else:
                 direction.append('Left')
-        
         return distance, direction
 
 
-    # Match node to edge
+    # Match node to edges
     def decode_node_to_edge(self, node, direction = None):
         """
         Given a node and direction, returns a list of edges associated with that node.
@@ -214,9 +205,18 @@ class traffic_env:
         return edge_direction
 
 
-    # ...
+    # Find the actions from a given edges
     def decode_edges_to_actions(self, action_space, edges):
-        """" ... """
+        """
+        Translate a list of given edges to their actions
+
+        Args:
+        - action_space (dict): The action_space of the agent
+        - edges (list): The list of edges to be translated
+
+        Returns:
+        - A list of actions (int)
+        """
 
         # Check if edges is in the edges list
         for edge in edges:
@@ -234,9 +234,19 @@ class traffic_env:
         return actions_lst
 
 
-    # ...
+    # Find the edge from a given edge and action
     def decode_edges_action_to_edge(self, action_space, edges, action):
-        """ action (int): """
+        """
+        Compute the new edge from a given edges and action taken.
+
+        Args:
+        - action_space (dict): The action_space of the agent
+        - edges (list): The list of edges to be translated
+        - action (int): The action taken
+
+        Returns:
+        - The new edge (str) or None if no match is found.
+        """
         
         # Check if edges is in the edges list
         for edge in edges:
@@ -252,9 +262,17 @@ class traffic_env:
         return None
     
 
-    # ...
+    # Find the end node from a given edge
     def decode_edge_to_node(self, search_edge):
-        """" ... """
+        """
+        Given an edge return the ending node of that edge
+
+        Args:
+        - search_edge (str): The edge to be computed
+
+        Returns:
+        - The end node (str)
+        """
 
         # Check if edges is in the edges list
         if search_edge not in self.edges:
@@ -262,130 +280,3 @@ class traffic_env:
 
         edge = self.net.getEdge(search_edge)
         return edge.getToNode().getID()
-
-
-    # # Find the new state from a given state and action
-    # def decode_state_action_to_state(self, action_space, current_state, action):
-    #     """
-    #     Calls `decode_state_direction` to determine the new state given the current_state and action taken.
-        
-    #     Args:
-    #     - current_state (str): The ID of the current state (edge).
-    #     - action (int): The action taken from the current state.
-
-    #     Returns:
-    #     - The new state (str) or None if no match is found.
-    #     """
-
-    #     # Check if state is in the State Space and action is in the Action Space
-    #     if current_state not in self.state_space:
-    #         sys.exit('Error: State not in State Space!')
-    #     elif action not in [action for action in action_space]:
-    #         sys.exit('Error: Action not in Action Space!')
-
-    #     # Determine the possible directions of the current_state
-    #     state_direction = self.state_direction # self.decode_state_to_direction()
-    #     serounding_states = [edge.getID() for edge in self.net.getEdge(current_state).getOutgoing().keys()]
-        
-    #     # Match the direction with the action to determine the new state
-    #     for state, direction in state_direction.items():
-    #         if state in serounding_states:
-    #             if direction == action_space[action]:
-    #                 # print(f'current_state: {current_state}, state_space: {serounding_states}, action": {action_space[action]}, state: {state}\n')
-    #                 return state
-    #     return None
-
-
-    # Configure Route File
-    def route_file_config(self, network_folder, time_start, time_end, blocked_routes, network_output_file, route_file, route_output_file, sumo_cfg_file):
-        """
-        Configures the SUMO route files.
-
-        Args:
-        - network_folder (str): The directory where the network files are stored.
-        - time_start (str): The start time of the simulation.
-        - time_end (str): The end time of the simulation.
-        - blocked_routes (list): A list of the routes that are blocked.
-        - network_output_file (str): The name of the SUMO network file.
-        - route_file (str): The name of the route file.
-        - route_output_file (str): The name of the SUMO route file.
-        - sumo_cfg_file (str): The name of the SUMO configuration file.
-
-        Returns:
-        - None
-        """
-
-        # Change directory to store files
-        os.chdir(network_folder)
-
-        # Create XML document for routes
-        def route_setup():
-            def block_route(edge):
-                # Function to Block Edges
-                route_block = ET.SubElement(root, "route", {"id": f"route_block_{edge}", "edges": edge})
-                vehicle_block = ET.SubElement(root, "vehicle", {"id": f"block_{edge}", "type": "car", "route": f"route_block_{edge}", "depart": time_start})
-                stop = ET.SubElement(vehicle_block, "stop", {"edge": edge, "duration": time_end})
-            try:
-                print(f"**Setting Up Route file --> {route_file} ...**")
-                root = ET.Element("routes")
-                vtype_car = ET.SubElement(root, "vType", {"id": "car"})
-                for route in blocked_routes:
-                    block_route(route)
-                tree = ET.ElementTree(root)
-                tree.write(route_file)
-                print("**Setup Completed!**")
-                print("**Successfully Setup Route file**\n")
-            except Exception as e:
-                print(f"**Error in setting up Route file: {e}**")
-                sys.exit(1)
-
-        # Convert route XML to SUMO format
-        def route_SUMO_setup():
-            try:
-                print(f"**Converting Route file to SUMO format --> {route_output_file} ...**")
-                os.system(f"duarouter --net-file={network_output_file} --route-files={route_file} --output-file={route_output_file}")
-                print("**Convert Completed!**")
-                print("**Successfully Convert Route file to SUMO format**\n")
-            except Exception as e:
-                print(f"**Error in converting Route file to SUMO format: {e}**")
-                sys.exit(1)
-
-        # Create SUMO document for combining route and network
-        def SUMO_setup():
-            try:
-                print(f"**Setting Up SUMO file --> {sumo_cfg_file} ...**")
-                root = ET.Element("configuration")
-                net = ET.SubElement(root, "input")
-                ET.SubElement(net, "net-file", value=network_output_file)
-                ET.SubElement(net, "route-files", value=route_output_file)
-                time = ET.SubElement(root, "time")
-                ET.SubElement(time, "begin", value=time_start)
-                ET.SubElement(time, "end", value=time_end)
-                ET.SubElement(time, "step-length", value="0.1")
-                tree = ET.ElementTree(root)
-                tree.write(sumo_cfg_file)
-                print("**Setup Completed!**")
-                print("**Successfully Setup SUMO file**\n")
-            except Exception as e:
-                print(f"**Error in setting up SUMO file: {e}**")
-                sys.exit(1)
-
-        # Convert SUMO cfg to SUMO format
-        def SUMO_SUMO_setup():
-            try:
-                print(f"**Converting SUMO file to SUMO format --> {sumo_cfg_file} ...**")
-                os.system(f'sumo -c {sumo_cfg_file}')
-                print("**Convert Completed!**")
-                print("**Successfully Convert SUMO file to SUMO format**\n")
-            except Exception as e:
-                print(f"**Error in converting SUMO file to SUMO format: {e}**")
-                sys.exit(1)
-
-        # Call the setup functions
-        route_setup()
-        route_SUMO_setup()
-        SUMO_setup()
-        SUMO_SUMO_setup()
-
-        # Change back to parent dir (cd ..)
-        os.chdir(os.pardir)

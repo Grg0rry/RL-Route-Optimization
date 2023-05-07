@@ -3,6 +3,19 @@ import xml.etree.ElementTree as ET
 
 
 def network_file_config(network_folder, node_file = 'nodes.nod.xml', edge_file = 'edges.edg.xml', network_output_file = 'network.net.xml'):
+    """
+    Configures the SUMO network files.
+
+    Args:
+    - network_folder (str): The directory where the network files are stored.
+    - node_file (str): The name of the node file.
+    - edge_file (str): The name of the edge file.
+    - network_output_file (str): The name of the SUMO network file.
+
+    Returns:
+    - network_output_file
+    """
+
     # Change directory to store files
     os.chdir(network_folder)
 
@@ -108,3 +121,98 @@ def network_file_config(network_folder, node_file = 'nodes.nod.xml', edge_file =
 
     # Return file name of network file
     return network_output_file
+
+
+# Configure Route File
+def route_file_config(network_folder, network_output_file, blocked_routes, time_start = "0", time_end = "3600", route_file = 'route.xml', route_output_file = 'routes.rou.xml', sumo_cfg_file = 'sumo_network.sumocfg'):
+    """
+    Configures the SUMO route files.
+
+    Args:
+    - network_folder (str): The directory where the network files are stored.
+    - network_output_file (str): The name of the SUMO network file.
+    - blocked_routes (list): A list of the routes that are blocked.
+    - time_start (str): The start time of the simulation.
+    - time_end (str): The end time of the simulation.
+    - route_file (str): The name of the route file.
+    - route_output_file (str): The name of the SUMO route file.
+    - sumo_cfg_file (str): The name of the SUMO configuration file.
+
+    Returns:
+    - None
+    """
+
+    # Change directory to store files
+    os.chdir(network_folder)
+
+    # Create XML document for routes
+    def route_setup():
+        def block_route(edge):
+            # Function to Block Edges
+            route_block = ET.SubElement(root, "route", {"id": f"route_block_{edge}", "edges": edge})
+            vehicle_block = ET.SubElement(root, "vehicle", {"id": f"block_{edge}", "type": "car", "route": f"route_block_{edge}", "depart": time_start})
+            stop = ET.SubElement(vehicle_block, "stop", {"edge": edge, "duration": time_end})
+        try:
+            print(f"**Setting Up Route file --> {route_file} ...**")
+            root = ET.Element("routes")
+            vtype_car = ET.SubElement(root, "vType", {"id": "car"})
+            for route in blocked_routes:
+                block_route(route)
+            tree = ET.ElementTree(root)
+            tree.write(route_file)
+            print("**Setup Completed!**")
+            print("**Successfully Setup Route file**\n")
+        except Exception as e:
+            print(f"**Error in setting up Route file: {e}**")
+            sys.exit(1)
+
+    # Convert route XML to SUMO format
+    def route_SUMO_setup():
+        try:
+            print(f"**Converting Route file to SUMO format --> {route_output_file} ...**")
+            os.system(f"duarouter --net-file={network_output_file} --route-files={route_file} --output-file={route_output_file}")
+            print("**Convert Completed!**")
+            print("**Successfully Convert Route file to SUMO format**\n")
+        except Exception as e:
+            print(f"**Error in converting Route file to SUMO format: {e}**")
+            sys.exit(1)
+
+    # Create SUMO document for combining route and network
+    def SUMO_setup():
+        try:
+            print(f"**Setting Up SUMO file --> {sumo_cfg_file} ...**")
+            root = ET.Element("configuration")
+            net = ET.SubElement(root, "input")
+            ET.SubElement(net, "net-file", value=network_output_file)
+            ET.SubElement(net, "route-files", value=route_output_file)
+            time = ET.SubElement(root, "time")
+            ET.SubElement(time, "begin", value=time_start)
+            ET.SubElement(time, "end", value=time_end)
+            ET.SubElement(time, "step-length", value="0.1")
+            tree = ET.ElementTree(root)
+            tree.write(sumo_cfg_file)
+            print("**Setup Completed!**")
+            print("**Successfully Setup SUMO file**\n")
+        except Exception as e:
+            print(f"**Error in setting up SUMO file: {e}**")
+            sys.exit(1)
+
+    # Convert SUMO cfg to SUMO format
+    def SUMO_SUMO_setup():
+        try:
+            print(f"**Converting SUMO file to SUMO format --> {sumo_cfg_file} ...**")
+            os.system(f'sumo -c {sumo_cfg_file}')
+            print("**Convert Completed!**")
+            print("**Successfully Convert SUMO file to SUMO format**\n")
+        except Exception as e:
+            print(f"**Error in converting SUMO file to SUMO format: {e}**")
+            sys.exit(1)
+
+    # Call the setup functions
+    route_setup()
+    route_SUMO_setup()
+    SUMO_setup()
+    SUMO_SUMO_setup()
+
+    # Change back to parent dir (cd ..)
+    os.chdir(os.pardir)

@@ -23,9 +23,7 @@ def sumo_configuration():
     sumo_version = os.popen("sumo --version").read().strip()
     traci_version = os.popen("pip show traci --version").read().strip()
     if sumo_version == traci_version:
-        print("The versions match.")
-    else:
-        print("SUMO version doesnt match with Traci")
+        # "The versions match."
 
 
 def sumo_simulation(network_file_directory, network_file, route):
@@ -48,35 +46,34 @@ def sumo_simulation(network_file_directory, network_file, route):
 
 if __name__ == '__main__':
     # Setting Up SUMO
-    sumo_configuration()
+    # sumo_configuration()
 
-    # Setting up Traffic Environment
+    # Setting up Traffic Network Environment
     network_file_directory = 'network_files/'
     network_file = traffic_network.network_file_config(network_file_directory)
-    route_map = """
-     B =/= E == H == K
-     |    |     |    |
-     |    |     |    |
-A == C == F =/= I == L == N
-     |    |     |    |
-     |    |     |    |
-     D == G == J =/= M
-    """
+
+    # Setting up Traffic Route Environment
     blocked_routes = ["gneE2", "-gneE2", "gneE6", "-gneE6", "gneE13", "-gneE13"]
-    env = environment.traffic_env(network_file_directory, network_file, blocked_routes, route_map)
-    
-    # cProfile.run('agent.Q_Learning(env).train(1000)')
+    traffic_network.route_file_config(network_folder, network_file, blocked_routes)
+
+    # Initiate Environment
+    env = environment.traffic_env(network_file_directory, network_file, blocked_routes)
 
     # Activate Agent
-    # for start_state in env.state_space:
-    #     for end_state in env.state_space:
-    #         Q_agent = agent.Q_Learning(env, start_state, end_state)
-    #         logs, episode = Q_agent.train(1000)
-    Q_agent = agent.Q_Learning(env)
+    """ 
+    Choose a start and End Node with the map below:
+        B =/= E ==  H == K
+        |     |     |    |
+        |     |     |    |
+    A == C == F =/= I == L == N
+        |     |     |    |
+        |     |     |    |
+        D ==  G == J =/= M
+    """
+    Q_agent = agent.Q_Learning(env, start_node = "A", end_node = "B")
     logs, episode = Q_agent.train(1000)
-    # sumo_simulation(network_file_directory, network_file, logs[episode])
 
-    S_agent = agent.SARSA(env)
+    S_agent = agent.SARSA(env, start_node = "A", end_node = "B")
     logs, episode = S_agent.train(1000)
 
 

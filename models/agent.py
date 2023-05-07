@@ -3,21 +3,22 @@ from collections import Counter
 
 
 class agent:
-    def __init__ (self, env, learning_rate = 0.9, discount_factor = 0.1):
+    def __init__ (self, env, start_node, end_node, learning_rate = 0.9, discount_factor = 0.1):
         # Define the learning parameters
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
 
         # Initialize environment
         self.env = env
-        
+        self.start_node = start_node
+        self.end_node = end_node
+
 
     # Reset agent
     def reset(self):
         """ Complete reset agent """
-        self.__init__(self.env)
-        self.start_node, self.end_node, self.action_space = self.env.set_start_end()
-        #self.action_space = self.env.set_start_end(self.start_node, self.end_node)
+        self.__init__(self.env, self.start_node, self.end_node)
+        self.action_space = self.env.set_start_end(self.start_node, self.end_node)
         self.q_table = np.zeros((len(self.env.state_space), len(self.action_space)))
 
 
@@ -56,7 +57,6 @@ class agent:
                         reward += 50
                     elif current_edge.replace("-", "") == next_edge.replace("-", ""):
                         reward = -50
-
         return next_edge, next_state, reward, terminate
 
 
@@ -71,7 +71,7 @@ class agent:
         logs = {}
         Threshold = 5
         self.reset()
-        print('Training Started...')
+        print('\nTraining Started...')
 
         for episode in range(num_episodes):
             # Initialize state
@@ -124,14 +124,12 @@ class agent:
 
 
 class SARSA(agent):
-    def __init__ (self, env, exploration_rate = 0.1):
+    def __init__ (self, env, start_node, end_node, exploration_rate = 0.1):
         # Inherit from main agent class
-        super().__init__(env)
+        super().__init__(env, start_node, end_node)
 
         # Define additional learning parameter
         self.exploration_rate = exploration_rate
-
-
 
 
     def act(self, state):
@@ -145,11 +143,10 @@ class SARSA(agent):
         return action
 
 
-
 class Q_Learning(agent):
-    def __init__ (self, env):
+    def __init__ (self, env, start_node, end_node):
         # Inherit from main agent class
-        super().__init__(env)
+        super().__init__(env, start_node, end_node)
 
 
     def act(self, state):
@@ -159,5 +156,3 @@ class Q_Learning(agent):
         #print(f'state: {state}, action: {self.q_table[state_index]}')
         #print(action)
         return action
-
-    
