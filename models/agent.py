@@ -217,7 +217,7 @@ class td_agent:
             edge_path.append(next(iter(edge)))
 
         # Print out results
-        print('Search Completed...\n')
+        print('Search Completed...')
         print(f'-- States: {node_path} \n-- Edges: {edge_path}')
         return node_path, edge_path
 
