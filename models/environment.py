@@ -1,52 +1,52 @@
-import os, sys
-import xml.etree.ElementTree as ET
+import sys
 import sumolib
 import math
 
 
 class traffic_env:
-    def __init__ (self, network_folder, network_output_file, blocked_routes):
+    def __init__ (self, network):
         # Define route nature
-        self.blocked_routes = blocked_routes
+        self.blocked_routes = network.blocked_routes
 
         # Parameters 
-        self.net = sumolib.net.readNet(os.path.join(network_folder,network_output_file))
+        self.net = sumolib.net.readNet(network.network_file)
         self.nodes = [node.getID().upper() for node in self.net.getNodes()]
         self.edges = [edge.getID() for edge in self.net.getEdges()]
-        # self.action_space = initiated in agent.py
+        self.action_space = {0: 'Up', 1: 'Right', 2: 'Down', 3: 'Left'}
         self.state_space = self.nodes
         self.edge_direction = self.decode_edges_to_direction()
 
 
-    def set_action_space(self, directions):
-        """
-        Adjust the action_space according to the direction of the start and end node
+    # Set optimized action space
+    # def set_action_space(self, directions):
+    #     """
+    #     Adjust the action_space according to the direction of the start and end node
 
-        Args:
-        - directions (list): The direction of the start node to the end node. Either only
-        one direction or two like Down, Right or only Down
+    #     Args:
+    #     - directions (list): The direction of the start node to the end node. Either only
+    #     one direction or two like Down, Right or only Down
         
-        Returns:
-        - A directionary of the action_space
-        """
+    #     Returns:
+    #     - A directionary of the action_space
+    #     """
         
-        # Define the clockwise rotation of directions
-        direction_dict = {'Up': 'Down', 'Right': 'Left', 'Down': 'Up', 'Left': 'Right'}
-        general_directions = list(direction_dict.keys())
+    #     # Define the clockwise rotation of directions
+    #     direction_dict = {'Up': 'Down', 'Right': 'Left', 'Down': 'Up', 'Left': 'Right'}
+    #     general_directions = list(direction_dict.keys())
 
-        # Sort the general direction list with the directions given
-        if len(directions) == 1:
-            starting_index = general_directions.index(directions[0])
-            reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
-        elif len(directions) == 2:
-            opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
-            reorder_list = directions + opposite
-        else:
-            reorder_list = general_directions
+    #     # Sort the general direction list with the directions given
+    #     if len(directions) == 1:
+    #         starting_index = general_directions.index(directions[0])
+    #         reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
+    #     elif len(directions) == 2:
+    #         opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
+    #         reorder_list = directions + opposite
+    #     else:
+    #         reorder_list = general_directions
 
-        # Returns action space
-        action_space = {i: reorder_list[i] for i in range(len(reorder_list))}
-        return action_space
+    #     # Returns action space
+    #     action_space = {i: reorder_list[i] for i in range(len(reorder_list))}
+    #     return action_space
 
 
     # Set starting and ending nodes
@@ -64,9 +64,6 @@ class traffic_env:
             sys.exit('Error: Invalid Start Node!')
         elif end_node not in self.nodes:
             sys.exit('Error: Invalid End Node!')
-
-        action_space = self.set_action_space(self.get_distance(start_node, end_node)[1])
-        return action_space
 
 
     # Distance between two edges/nodes

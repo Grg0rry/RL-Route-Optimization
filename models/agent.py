@@ -19,29 +19,32 @@ class rl_agent:
     def reset(self):
         # Complete reset agent
         self.__init__(self.env, self.start_node, self.end_node)
-        self.action_space = self.env.set_start_end(self.start_node, self.end_node)
-        self.q_table = np.zeros((len(self.env.state_space), len(self.action_space)))
+        self.env.set_start_end(self.start_node, self.end_node)
+        # self.env.action_space = self.env.set_action_space(self.get_distance(self.start_node, self.end_node)[1])
+        self.q_table = np.zeros((len(self.env.state_space), len(self.env.action_space)))
 
 
     def act(self, state):
         pass
 
 
-    def step(self, action, current_state, current_edge):
+    def step(self, action, state_list, edge_list):
         # initialize var
         terminate = False
         reward = 0
+        current_state = state_list[-1]
+        current_edge = edge_list[-1] if edge_list else None
 
         # Get list of outgoing edges     
         outgoing_edges = self.env.decode_node_to_edges(current_state, direction = 'outgoing')
 
         # Compute reward and next state
-        if action not in self.env.decode_edges_to_actions(self.action_space, outgoing_edges): # -- out of bound
+        if action not in self.env.decode_edges_to_actions(self.env.action_space, outgoing_edges): # -- out of bound
             reward -= 50
             next_state = current_state
             next_edge = current_edge
         else:
-            next_edge = self.env.decode_edges_action_to_edge(self.action_space, outgoing_edges, action)
+            next_edge = self.env.decode_edges_action_to_edge(self.env.action_space, outgoing_edges, action)
             next_state = self.env.decode_edge_to_node(next_edge)
 
             if next_edge in self.env.blocked_routes: # -- blocked_routes
@@ -51,13 +54,18 @@ class rl_agent:
                 reward += 100
                 terminate = True
             else:
-                if self.env.get_distance(next_state, self.end_node) < self.env.get_distance(current_state, self.end_node):
-                    reward += 0
-                elif current_edge != "":
+                if current_edge != None:
                     if self.env.edge_direction[current_edge] == self.env.edge_direction[next_edge]:
                         reward += 50
-                    elif current_edge.replace("-", "") == next_edge.replace("-", ""):
-                        reward -= 50
+                    if current_edge.replace("-", "") == next_edge.replace("-", ""): # prevent going backwards
+                        reward -= 0
+                    if (current_edge, next_edge) in [(edge_list[i], edge_list[i+1]) for i in range(len(edge_list)-1)]: # Check if its in a loop
+                        reward -= 50      
+                    if self.env.get_distance(next_state, self.end_node) > self.env.get_distance(current_state, self.end_node): # check if its closer to end_node
+                        reward += 0
+
+        #print(f'current edge: {current_edge}, action: {action}, reward: {reward}, next edge: {next_edge}')
+        #print(self.q_table[self.env.state_space.index(next_state)])
         return next_edge, next_state, reward, terminate
 
 
@@ -71,34 +79,30 @@ class rl_agent:
     def train(self, num_episodes, threshold):
         logs = {}
         self.reset()
-        print('\nTraining Started...')
+        print('Training Started...')
 
         for episode in range(num_episodes):
             # Initialize state
-            state = self.start_node
-            edge = ""
-            state_journey = [state]
+            state_journey = [self.start_node]
             edge_journey = []
             terminate = False
 
             # Iterate till terminate
             while True:
-                if terminate or state in self.end_node:
+                last_state = state_journey[-1]
+                if terminate or last_state in self.end_node:
                     break
 
-                action = self.act(state)
-                next_edge, next_state, reward, terminate = self.step(action, state, edge)
+                action = self.act(last_state)
+                next_edge, next_state, reward, terminate = self.step(action, state_journey, edge_journey)
 
                 # Learn from the outcome
-                self.learn(state, action, next_state, reward)
-                
+                self.learn(last_state, action, next_state, reward)
+
                 # Update state
-                if state != next_state:
+                if last_state != next_state:
                     edge_journey.append(next_edge)
                     state_journey.append(next_state)
-                state = next_state
-                edge = next_edge
-
 
             # Append to logs and print after every episode
             logs[episode] = [state_journey, edge_journey]
@@ -134,7 +138,7 @@ class SARSA(rl_agent):
     def act(self, state):
         if np.random.random() < self.exploration_rate:
             # Exploration
-            action = np.random.choice(len(self.action_space))
+            action = np.random.choice(len(self.env.action_space))
         else:
             # Exploitation
             state_index = self.env.state_space.index(state)
@@ -248,3 +252,45 @@ class A_Star(td_agent):
         return abs(start_x - end_x) + abs(start_y - end_y)
 
         
+
+### MODIFYING --IGNORE
+class modified_bfs_agent:
+    def __init__ (self, env, start_node, end_node):
+        # Initialize environment
+        self.env = env
+        self.start_node = start_node
+        self.end_node = end_node
+
+    
+    def reset(self):
+        # Initialize the distance and predecessor arrays.
+        self.frontier = [[self.start_node]]
+        self.explored = []
+        self.solution = []
+
+
+    def search(self):
+        self.reset()
+        found_goal = False
+
+        while not found_goal:
+            current_node = self.frontier[0][-1]
+            children = [self.frontier[0] + [self.env.decode_edge_to_node(edge) for edge in self.env.decode_node_to_edges(current_node, direction = 'outgoing')]]
+            print(children)
+            self.explored.append(current_node)
+            del self.frontier[0]
+            print(self.frontier)
+            print(self.explored)
+
+            for child in children:
+                last_child = child[-1]
+                if not (last_child in self.explored) and not (last_child in [f[-1] for f in self.frontier]):
+                    if last_child == self.end_node:
+                        found_goal = True
+                        self.solution = child
+                    self.frontier.append(child)
+
+        # Print out results
+        print('Search Completed...')
+        print(f'-- States: {self.solution} \n-- Edges: {"working in progress"}')
+        return self.solution, [] #edge_path
