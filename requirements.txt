@@ -1,4 +1,5 @@
-sumo
-traci
+networkx
+matplotlib
 sumolib
 numpy
+sumo

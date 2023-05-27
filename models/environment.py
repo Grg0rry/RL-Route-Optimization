@@ -1,52 +1,25 @@
 import sys
 import sumolib
 import math
+import random
 
 
 class traffic_env:
-    def __init__ (self, network):
-        # Define route nature
-        self.blocked_routes = network.blocked_routes
-
+    def __init__ (self, network_file, blocked_routes = [], random_edge = 6):
         # Parameters 
-        self.net = sumolib.net.readNet(network.network_file)
+        self.net = sumolib.net.readNet(network_file)
         self.nodes = [node.getID().upper() for node in self.net.getNodes()]
         self.edges = [edge.getID() for edge in self.net.getEdges()]
-        self.action_space = {0: 'Up', 1: 'Right', 2: 'Down', 3: 'Left'}
+        self.action_space = [0, 1, 2, 3]
         self.state_space = self.nodes
-        self.edge_direction = self.decode_edges_to_direction()
+        self.edge_label = self.decode_edges_to_label()
 
-
-    # Set optimized action space
-    # def set_action_space(self, directions):
-    #     """
-    #     Adjust the action_space according to the direction of the start and end node
-
-    #     Args:
-    #     - directions (list): The direction of the start node to the end node. Either only
-    #     one direction or two like Down, Right or only Down
-        
-    #     Returns:
-    #     - A directionary of the action_space
-    #     """
-        
-    #     # Define the clockwise rotation of directions
-    #     direction_dict = {'Up': 'Down', 'Right': 'Left', 'Down': 'Up', 'Left': 'Right'}
-    #     general_directions = list(direction_dict.keys())
-
-    #     # Sort the general direction list with the directions given
-    #     if len(directions) == 1:
-    #         starting_index = general_directions.index(directions[0])
-    #         reorder_list = general_directions[starting_index:] + general_directions[:starting_index]
-    #     elif len(directions) == 2:
-    #         opposite = [direction_dict[directions[0]], direction_dict[directions[1]]]
-    #         reorder_list = directions + opposite
-    #     else:
-    #         reorder_list = general_directions
-
-    #     # Returns action space
-    #     action_space = {i: reorder_list[i] for i in range(len(reorder_list))}
-    #     return action_space
+        # Define route nature
+        if not blocked_routes:
+            self.blocked_routes = random.choices(self.edges, k = random_edge)
+        else:
+            self.blocked_routes = blocked_routes
+        print(f'Blocked Routes: {self.blocked_routes}\n')
 
 
     # Set starting and ending nodes
@@ -102,20 +75,7 @@ class traffic_env:
         y_diff = end_y - start_y
         distance = math.sqrt(x_diff**2 + y_diff**2)
 
-        # Get the direction either Up, Down, Left or Right
-        direction = []
-        if y_diff != 0:
-            if y_diff > 0:
-                direction.append('Up')
-            else:
-                direction.append('Down')
-
-        if x_diff != 0:
-            if x_diff > 0:
-                direction.append('Right')
-            else:
-                direction.append('Left')
-        return distance, direction
+        return distance
 
 
     # Match node to edges
@@ -156,14 +116,12 @@ class traffic_env:
             for edge in net_node.getIncoming() + net_node.getOutgoing():
                 if edge.getToNode().getID() == node or edge.getFromNode().getID() == node:
                     edges.append(edge.getID())
-
-        if not edges:
-            print(f'No edges found for node {node}')
+        
         return edges
     
 
-    # Find the direction from a given edge
-    def decode_edges_to_direction(self):
+    # Label edges based of junction from (Right -> Up -> Left -> Down)
+    def decode_edges_to_label(self):
         """
         Iterates through the whole state space and returns a dictionary of each state and the direction it is headed.
 
@@ -171,44 +129,47 @@ class traffic_env:
         - A dictionary of states (str) matched with its direction.
         """
 
-        edge_direction = {}
-        def get_edge_direction(edge):
-            # Find the direction and angle between two nodes to determine the edge direction
-            start_node = self.net.getEdge(edge).getFromNode().getID()
-            end_node = self.net.getEdge(edge).getToNode().getID()
-
-            start_x, start_y = self.net.getNode(start_node).getCoord()
-            end_x, end_y = self.net.getNode(end_node).getCoord()
-            
-            # Calculate the direction of the nodes in radians
-            direction = math.degrees(math.atan2(end_y - start_y, end_x - start_x))
-
-            # Get the degree boundary it falls in
-            if direction < 0:
-                direction += 360
-            
-            if direction < 90:
-                return 'Right'
-            elif direction < 180:
-                return 'Up'
-            elif direction < 270:
-                return 'Left'
-            else:
-                return 'Down'
+        edge_labelled = {edge: None for edge in self.edges}
         
-        # Iterate through every state in the state space and compute its direction
-        for edge in self.edges:
-            edge_direction[edge] = get_edge_direction(edge)
-        return edge_direction
+        def get_edge_label(node, outgoing_edges):
+            # store edge angle
+            edge_angle = []
+
+            # get the nodes outgoing
+            start_x, start_y = self.net.getNode(node).getCoord()
+            
+            # get outgoing edges
+            for edge in outgoing_edges:
+                end_node = self.decode_edge_to_node(edge)
+                end_x, end_y = self.net.getNode(end_node).getCoord()
+
+                x_diff = end_x - start_x
+                y_diff = end_y - start_y
+
+                # get their angle
+                angle = math.degrees(math.atan2(y_diff, x_diff))
+                edge_angle.append((edge, angle))
+
+            # sort from 0 to 180 to -180 to 0 (Right -> Up -> Left -> Down -> Right)
+            edge_angle = sorted(edge_angle, key=lambda x: ((x[1] >= 0) * -180, x[1]))
+            
+            # label edges
+            for i in range(len(edge_angle)):
+                edge_labelled[edge_angle[i][0]] = i
+
+        for node in self.nodes:
+            outgoing_edges = self.decode_node_to_edges(node, 'outgoing')
+            if outgoing_edges:
+                get_edge_label(node, outgoing_edges)
+        return edge_labelled
 
 
     # Find the actions from a given edges
-    def decode_edges_to_actions(self, action_space, edges):
+    def decode_edges_to_actions(self, edges):
         """
         Translate a list of given edges to their actions
 
         Args:
-        - action_space (dict): The action_space of the agent
         - edges (list): The list of edges to be translated
 
         Returns:
@@ -220,24 +181,23 @@ class traffic_env:
             if edge not in self.edges:
                 sys.exit(f'Error: Edge {edge} not in Edges Space!')
 
-        # Get the direction of each edge
-        edge_direction = self.edge_direction
+        # Get the label of each edge
+        edge_label = self.edge_label
 
         # Returns a list of actions
         actions_lst = []
-        for action, direction in action_space.items():
-            if direction in [edge_direction[edge] for edge in edges]:
+        for action in self.action_space:
+            if action in [edge_label[edge] for edge in edges]:
                 actions_lst.append(action)
         return actions_lst
 
 
     # Find the edge from a given edge and action
-    def decode_edges_action_to_edge(self, action_space, edges, action):
+    def decode_edges_action_to_edge(self, edges, action):
         """
         Compute the new edge from a given edges and action taken.
 
         Args:
-        - action_space (dict): The action_space of the agent
         - edges (list): The list of edges to be translated
         - action (int): The action taken
 
@@ -251,10 +211,10 @@ class traffic_env:
                 sys.exit(f'Error: Edge {edge} not in Edges Space!')
 
         # Get the direction of each edge
-        edge_direction = self.edge_direction
+        edge_label = self.edge_label
         
         for edge in edges:
-            if edge_direction[edge] == action_space[action]:
+            if edge_label[edge] == action:
                 return edge
         return None
     

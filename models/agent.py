@@ -20,7 +20,6 @@ class rl_agent:
         # Complete reset agent
         self.__init__(self.env, self.start_node, self.end_node)
         self.env.set_start_end(self.start_node, self.end_node)
-        # self.env.action_space = self.env.set_action_space(self.get_distance(self.start_node, self.end_node)[1])
         self.q_table = np.zeros((len(self.env.state_space), len(self.env.action_space)))
 
 
@@ -39,12 +38,12 @@ class rl_agent:
         outgoing_edges = self.env.decode_node_to_edges(current_state, direction = 'outgoing')
 
         # Compute reward and next state
-        if action not in self.env.decode_edges_to_actions(self.env.action_space, outgoing_edges): # -- out of bound
+        if action not in self.env.decode_edges_to_actions(outgoing_edges): # -- out of bound
             reward -= 50
             next_state = current_state
             next_edge = current_edge
         else:
-            next_edge = self.env.decode_edges_action_to_edge(self.env.action_space, outgoing_edges, action)
+            next_edge = self.env.decode_edges_action_to_edge(outgoing_edges, action)
             next_state = self.env.decode_edge_to_node(next_edge)
 
             if next_edge in self.env.blocked_routes: # -- blocked_routes
@@ -53,14 +52,15 @@ class rl_agent:
             elif next_state in self.end_node: # -- completed
                 reward += 100
                 terminate = True
+            elif not self.env.decode_node_to_edges(next_state, direction = 'outgoing'): # -- dead end
+                reward -= 50
+                terminate = True
             else:
                 if current_edge != None:
-                    if self.env.edge_direction[current_edge] == self.env.edge_direction[next_edge]:
-                        reward += 50
                     if current_edge.replace("-", "") == next_edge.replace("-", ""): # prevent going backwards
                         reward -= 0
                     if (current_edge, next_edge) in [(edge_list[i], edge_list[i+1]) for i in range(len(edge_list)-1)]: # Check if its in a loop
-                        reward -= 50      
+                        reward -= 50
                     if self.env.get_distance(next_state, self.end_node) > self.env.get_distance(current_state, self.end_node): # check if its closer to end_node
                         reward += 0
 
@@ -79,7 +79,7 @@ class rl_agent:
     def train(self, num_episodes, threshold):
         logs = {}
         self.reset()
-        print('Training Started...')
+        # print('Training Started...')
 
         for episode in range(num_episodes):
             # Initialize state
@@ -106,7 +106,7 @@ class rl_agent:
 
             # Append to logs and print after every episode
             logs[episode] = [state_journey, edge_journey]
-            print(f'{episode}: {logs[episode]}')
+            # print(f'{episode}: {logs[episode]}')
 
             # Compute Convergence
             if episode > 0 and logs[episode][0][-1] == self.end_node:
@@ -194,7 +194,7 @@ class td_agent:
                     continue
                 
                 # Calculate the tentative distance of the neighbor.
-                tentative_cost = current_distance + self.env.get_distance(current_node, neigh_node)[0]
+                tentative_cost = current_distance + self.env.get_distance(current_node, neigh_node)
 
                 # If the tentative distance is less than the current distance of the neighbor:
                 if tentative_cost < self.distances[neigh_node]:
