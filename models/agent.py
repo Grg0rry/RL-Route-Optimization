@@ -57,6 +57,7 @@ class rl_agent:
                 terminate = True
             else:
                 if current_edge != None:
+                    # check other outgoing edges and reward for shorter distance
                     if current_edge.replace("-", "") == next_edge.replace("-", ""): # prevent going backwards
                         reward -= 0
                     if (current_edge, next_edge) in [(edge_list[i], edge_list[i+1]) for i in range(len(edge_list)-1)]: # Check if its in a loop
@@ -159,7 +160,7 @@ class Q_Learning(rl_agent):
         return action
 
 
-class td_agent:
+class Dijkstra:
     def __init__ (self, env, start_node, end_node):
         # Initialize environment
         self.env = env
@@ -205,7 +206,7 @@ class td_agent:
                     self.predecessor[neigh_node] = current_node
                     
                     # Add the neighbor to the priority queue.
-                    self.heap_push(tentative_cost, neigh_node)
+                    heapq.heappush(self.priority_queue, (tentative_cost, neigh_node))
                 
         # Construct the path from the start node to the goal node.
         node_path = []
@@ -224,73 +225,3 @@ class td_agent:
         print('Search Completed...')
         print(f'-- States: {node_path} \n-- Edges: {edge_path}')
         return node_path, edge_path
-
-
-class Dijkstra(td_agent):
-    def __init__ (self, env, start_node, end_node):
-        # Inherit from main agent class
-        super().__init__(env, start_node, end_node)
-
-
-    def heap_push(self, tentative_cost, neigh_node):
-        return heapq.heappush(self.priority_queue, (tentative_cost, neigh_node))
-
-
-class A_Star(td_agent):
-    def __init__ (self, env, start_node, end_node):
-        # Inherit from main agent class
-        super().__init__(env, start_node, end_node)
-
-
-    def heap_push(self, tentative_cost, neigh_node):
-        return heapq.heappush(self.priority_queue, (tentative_cost + self.heuristic(neigh_node, self.end_node), neigh_node))
-    
-
-    def heuristic(self, neigh_node, end_node):
-        start_x, start_y = self.env.net.getNode(neigh_node).getCoord()
-        end_x, end_y = self.env.net.getNode(end_node).getCoord()
-        return abs(start_x - end_x) + abs(start_y - end_y)
-
-        
-
-### MODIFYING --IGNORE
-class modified_bfs_agent:
-    def __init__ (self, env, start_node, end_node):
-        # Initialize environment
-        self.env = env
-        self.start_node = start_node
-        self.end_node = end_node
-
-    
-    def reset(self):
-        # Initialize the distance and predecessor arrays.
-        self.frontier = [[self.start_node]]
-        self.explored = []
-        self.solution = []
-
-
-    def search(self):
-        self.reset()
-        found_goal = False
-
-        while not found_goal:
-            current_node = self.frontier[0][-1]
-            children = [self.frontier[0] + [self.env.decode_edge_to_node(edge) for edge in self.env.decode_node_to_edges(current_node, direction = 'outgoing')]]
-            print(children)
-            self.explored.append(current_node)
-            del self.frontier[0]
-            print(self.frontier)
-            print(self.explored)
-
-            for child in children:
-                last_child = child[-1]
-                if not (last_child in self.explored) and not (last_child in [f[-1] for f in self.frontier]):
-                    if last_child == self.end_node:
-                        found_goal = True
-                        self.solution = child
-                    self.frontier.append(child)
-
-        # Print out results
-        print('Search Completed...')
-        print(f'-- States: {self.solution} \n-- Edges: {"working in progress"}')
-        return self.solution, [] #edge_path
