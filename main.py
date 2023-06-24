@@ -1,10 +1,9 @@
 import os, sys
-import datetime
 
 sys.path.append('models/')
 import environment
 import agent
-import evaluation
+import dijkstra
 
 
 def sumo_configuration():
@@ -27,68 +26,51 @@ if __name__ == '__main__':
     # Fixed Network
     # [A, B, C, D, E, F, G, H, I, J, K, L, M, N]
     # -------------------
-    network_file = './network_files/fixed_network.net.xml'
-    blocked_routes = ["gneF_I", "gneI_F", "gneB_E", "gneE_B", "gneJ_M", "gneM_J"]
-    start_node = "A"
-    end_node = "N"
+    # network_file = './network_files/fixed_network.net.xml'
+    # congested = [("gneF_I", 10), ("gneI_F", 10), ("gneB_E", 20), ("gneE_B", 20), ("gneJ_M", 30), ("gneM_J", 30)]
+    # traffic_light = [("B", 5), ("I", 5), ("G", 5)]
+    # start_node = "A"
+    # end_node = "N"
 
     # -------------------
     # OSM Network
     # [101: Sunway University, 102: Monash University, 103: Sunway Geo, 104: Sunway Medical, 105: Taylors University, 106: Sunway Pyramid, 107: Sunway Lagoon, 108: PJS10 Park]
     # -------------------
-    # network_file = './network_files/sunway.net.xml'
-    # blocked_routes = []
-    # start_node = "101"
-    # end_node = "105"
+    network_file = './network_files/sunway.net.xml'
+    congested = [("gne2124969573_1000000001", 10), ("gne677583745_2302498575", 10), ("gne5236931684_143675326", 20), ("gne1000000001_5735834058", 20), ("gne10734244602_1640449323", 10)]
+    traffic_light = [("463099148", 5), ("678457498", 5), ("678457535", 5), ("678457587", 5), ("712814465", 5), ("1197913486", 5), ("1197913517", 5), ("2210132568", 5), ("2210132847", 5), ("2747527085", 5), ("4123498068", 5), ("5727497436", 5), ("5762726921", 5), ("8948947765", 5), ("9209244285", 5), ("10845806303", 5), ("10845816012", 5)]
+    start_node = "101"
+    end_node = "105"
 
     # 03 Initiate Environment
-    env = environment.traffic_env(network_file, blocked_routes)
+    env = environment.traffic_env(network_file, congested, traffic_light, evaluation = "d")
+    num_episodes = 5000
+    num_converge = 5
 
     # 04 Activate Agent
     # -------------------
     # Dijkstra Algorithm
     # -------------------
     print(f'Dijkstra Algorithm{"." * 100}')
-    start_time = datetime.datetime.now()
-    D_agent = agent.Dijkstra(env, start_node, end_node)
-    node_path, edge_path, *_ = D_agent.search()
-    end_time = datetime.datetime.now()
-    time_difference = end_time - start_time
-    seconds = time_difference.total_seconds()
-    print(f'Processsing Time: {seconds} seconds')
-    distance = evaluation.evaluate_distance(env, node_path)
-    print(f'Distance travelled: {round(distance, 2)} m')
-    evaluation.visualize_plot(network_file, edge_path)
+    Dijkstra = dijkstra.Dijkstra(env, start_node, end_node)
+    node_path, edge_path, *_ = Dijkstra.search()
+    env.visualize_plot(edge_path)
 
     # -------------------
     # Q_Learning Algorithm
     # -------------------
     print(f'\nQ_Learning Algorithm{"." * 100}')
-    start_time = datetime.datetime.now()
     Q_agent = agent.Q_Learning(env, start_node, end_node)
-    node_path, edge_path, *_ = Q_agent.train(1000, 5)
-    end_time = datetime.datetime.now()
-    time_difference = end_time - start_time
-    seconds = time_difference.total_seconds()
-    print(f'Processing Time: {seconds} seconds')
-    distance = evaluation.evaluate_distance(env, node_path)
-    print(f'Distance travelled: {round(distance, 2)} m')
-    evaluation.visualize_plot(network_file, edge_path)
+    node_path, edge_path, *_ = Q_agent.train(num_episodes, num_converge)
+    env.visualize_plot(edge_path)
 
     # -------------------
     # SARSA Algorithm
     # -------------------
     print(f'\nSARSA Algorithm{"." * 100}')
-    start_time = datetime.datetime.now()
-    S_agent = agent.SARSA(env, start_node, end_node)
-    node_path, edge_path, *_ = S_agent.train(1000, 5)
-    end_time = datetime.datetime.now()
-    time_difference = end_time - start_time
-    seconds = time_difference.total_seconds()
-    print(f'Processing Time: {seconds} seconds')
-    distance = evaluation.evaluate_distance(env, node_path)
-    print(f'Distance travelled: {round(distance, 2)} m')
-    evaluation.visualize_plot(network_file, edge_path)    
+    S_agent = agent.SARSA(env, start_node, end_node, exploration_rate = 0.2)
+    node_path, edge_path, *_ = S_agent.train(num_episodes, num_converge)
+    env.visualize_plot(edge_path)
 
 
     # Evaluate Model Performance

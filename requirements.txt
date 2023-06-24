@@ -2,4 +2,3 @@ networkx
 matplotlib
 sumolib
 numpy
-sumo

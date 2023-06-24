@@ -1,12 +1,14 @@
 import sys
 import sumolib
 import math
-import random
+import networkx as nx
+import matplotlib.pyplot as plt
 
 
 class traffic_env:
-    def __init__ (self, network_file, blocked_routes = [], random_edge = 6):
+    def __init__ (self, network_file, congested = [], traffic_light = [], evaluation = "", travel_speed = 80):
         # Parameters 
+        self.network_file = network_file
         self.net = sumolib.net.readNet(network_file)
         self.nodes = [node.getID().upper() for node in self.net.getNodes()]
         self.edges = [edge.getID() for edge in self.net.getEdges()]
@@ -14,12 +16,29 @@ class traffic_env:
         self.state_space = self.nodes
         self.edge_label = self.decode_edges_to_label()
 
-        # Define route nature
-        if not blocked_routes:
-            self.blocked_routes = random.choices(self.edges, k = random_edge)
-        else:
-            self.blocked_routes = blocked_routes
-        print(f'Blocked Routes: {self.blocked_routes}\n')
+        # Define congestions edges
+        self.congested_edges = [item[0] for item in congested]
+        self.congestion_duration = [item[1] for item in congested]
+        for edge in self.congested_edges:
+            if edge not in self.edges:
+                sys.exit(f'The edge {edge} in congestion_edges provided does not exist')        
+        print(f'Congestion edges are: {self.congested_edges}')
+        
+        # Define traffic lights nodes
+        self.tl_nodes = [item[0] for item in traffic_light]
+        self.tl_duration = [item[1] for item in traffic_light]
+        for node in self.tl_nodes:
+            if node not in self.nodes:
+                sys.exit(f'The node {node} in traffic_lights provided does not exist')
+        print(f'Traffic Light nodes are: {self.tl_nodes}')
+
+        # Define evaluation type
+        if evaluation.lower() not in ('distance', 'd', 'time', 't'):
+            sys.exit('please provide only distance, d or time, t as the evaluation method')
+        self.evaluation = evaluation.lower()
+
+        # Calculate time parameters
+        self.travel_speed = travel_speed
 
 
     # Set starting and ending nodes
@@ -37,45 +56,9 @@ class traffic_env:
             sys.exit('Error: Invalid Start Node!')
         elif end_node not in self.nodes:
             sys.exit('Error: Invalid End Node!')
-
-
-    # Distance between two edges/nodes
-    def get_distance(self, start, end, start_type = 'node', end_type = 'node'):
-        """
-        Given a start and end point (node or edge), returns the distance and direction between them.
-
-        Args:
-        - start (str): The ID of the starting point
-        - end (str): The ID of the ending point
-        - start_type (str): The type of the starting point (node or edge)
-        - end_type (str): The type of the ending point (node or edge)
-
-        Returns:
-        - A tuple of Distance (int) and Direction (list) between the two points 
-        """
-
-        # Check if the nodes or edges are valid
-        if start not in self.nodes and start not in self.edges:
-            sys.exit('Error: Invalid Start Point!')
-        elif end not in self.nodes and end not in self.edges:
-            sys.exit('Error: Invalid End Point!')
-        
-        # Convert all Edges to Nodes for comparison
-        if start_type == 'edge':
-            start = self.net.getEdge(start).getToNode().getID()
-        elif end_type == 'edge':
-            end = self.net.getEdge(end).getToNode().getID()
-        
-        # Get the coordinates
-        start_x, start_y = self.net.getNode(start).getCoord()
-        end_x, end_y = self.net.getNode(end).getCoord()
-
-        # Calculates the distance
-        x_diff = end_x - start_x
-        y_diff = end_y - start_y
-        distance = math.sqrt(x_diff**2 + y_diff**2)
-
-        return distance
+        else:
+            self.start_node = start_node
+            self.end_node = end_node
 
 
     # Match node to edges
@@ -220,15 +203,18 @@ class traffic_env:
     
 
     # Find the end node from a given edge
-    def decode_edge_to_node(self, search_edge):
+    def decode_edge_to_node(self, search_edge, direction = 'end'):
         """
-        Given an edge return the ending node of that edge
+        Given an edge return the start or ending node of that edge
 
         Args:
         - search_edge (str): The edge to be computed
+        - direction (str): The direction of the node to return
+          - 'start': node is the start of the edge
+          - 'end': node is the end of the edge (default)
 
         Returns:
-        - The end node (str)
+        - The node (str)
         """
 
         # Check if edges is in the edges list
@@ -236,4 +222,120 @@ class traffic_env:
             sys.exit('Error: Edge not in Edges Space!')
 
         edge = self.net.getEdge(search_edge)
-        return edge.getToNode().getID()
+
+        if direction == 'start':
+            node = edge.getFromNode().getID()
+
+        elif direction == 'end':  
+            node = edge.getToNode().getID()
+
+        return node
+    
+
+    # Find the total distance travelled from a given pathway of nodes
+    def get_edge_distance(self, travel_edges):
+        """
+        Calculates the cost function (distance travelled) through the select pathway/route
+
+        Args:
+        - travel_edges: The list of edges of the selected route.
+
+        Return:
+        - total_distance (float): The total distance travelled
+        """
+        
+        total_distance = 0
+        if isinstance(travel_edges, str):
+            travel_edges = [travel_edges]
+
+        # Get the length of the edge
+        for edge in travel_edges:       
+            # Check if edges is in the edges list
+            if edge not in self.edges:
+                sys.exit(f'Error: Edge {edge} not in Edges Space!')
+            total_distance += self.net.getEdge(edge).getLength()
+        
+        return total_distance
+
+
+    # Find the total time taken from a given pathway of nodes and edges
+    def get_edge_time(self, travel_edges):
+        """
+        Calculates the cost function (time taken) through the select pathway/route
+
+        Args:
+        - travel_edges: The list of edges of the selected route.
+        - speed: The speed travel (constant) km/h
+        - congestion_duration: The time taken for stuck in congestion (in minutes)
+        - traffic_light_duration: The time taken for stuck in traffic light (in minutes)
+
+        Return:
+        - total_time (float): The total time taken to travel (in minutes)
+        """
+        
+        total_time = ((self.get_edge_distance(travel_edges)/1000) / self.travel_speed) * 60 # in minutes
+
+        if isinstance(travel_edges, str):
+            travel_edges = [travel_edges]
+        
+        # time punishment
+        for edge in travel_edges:
+            # congested area
+            if edge in self.congested_edges:
+                total_time += self.congestion_duration[self.congested_edges.index(edge)]
+            
+            # traffic light
+            node = self.decode_edge_to_node(edge, direction = 'end')
+            if node in self.tl_nodes:
+                total_time += self.tl_duration[self.tl_nodes.index(node)]
+
+        return total_time
+
+
+    # ------ Graph Visualization ------
+    def visualize_plot(self, travel_edges):
+        """
+        Plotting of network with selected route
+
+        Args:
+        - travel_edges (list): The list of edges of the selected route.
+        - network_files_directory (str): The directory of the network files.
+        - root_file (str): The initial name of the root file to be converted from network_file.
+
+        Return:
+        - Plot of network
+        """
+
+        nodes_dict = {}
+        for node in self.nodes:
+            x_coord, y_coord = self.net.getNode(node).getCoord()
+            nodes_dict[node] = (x_coord, y_coord)
+        
+        edges_dict = {}
+        for edge in self.edges:
+            from_id = self.net.getEdge(edge).getFromNode().getID()
+            to_id = self.net.getEdge(edge).getToNode().getID()
+            edges_dict[edge] = (from_id, to_id)
+            
+        # Draws the network layout
+        G = nx.Graph()
+        for edge in edges_dict:
+            G.add_edge(edges_dict[edge][0], edges_dict[edge][1])
+        pos = {node: nodes_dict[node] for node in nodes_dict}
+        nx.draw(G, pos, with_labels=False, node_color='black', node_size=200, edge_color='gray')
+
+        # Draws the selected route
+        route_G = nx.Graph()
+        for edge in travel_edges:
+            route_G.add_edge(edges_dict[edge][0], edges_dict[edge][1])
+        nx.draw(route_G, pos, with_labels=False, node_color='green', node_size=300, edge_color='green', width = 2)
+
+        if self.evaluation in ("time", "t"):
+            # Highlight traffic light nodes
+            nx.draw_networkx_nodes(G, pos, nodelist=self.tl_nodes, node_color='red', node_size=300)
+
+            # Highlight congestion edges
+            congested_lst = [edges_dict[edge] for edge in self.congested_edges]
+            nx.draw_networkx_edges(G, pos, edgelist=congested_lst, edge_color='red', width=2)
+        
+        plt.show()

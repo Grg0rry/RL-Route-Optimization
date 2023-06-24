@@ -4,26 +4,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-def evaluate_distance(env, travel_nodes):
-    """
-    Calculates the cost function (distance travelled) through the select pathway/route
-
-    Args:
-    - env: The network class/environment.
-    - travel_nodes: The list of nodes of the selected route.
-
-    Return:
-    - total_distance (float): The total distance travelled
-    """
-
-    total_distance = 0
-
-    for index in range(len(travel_nodes)-1):
-        total_distance += env.get_distance(travel_nodes[index], travel_nodes[index + 1])
-
-    return total_distance
-
-
 def visualize_plot(network_file, travel_edges, network_files_directory = "network_files", root_file="network"):
     """
     Plotting of network with selected route
@@ -51,7 +31,7 @@ def visualize_plot(network_file, travel_edges, network_files_directory = "networ
 
     # convert network_file to root form
     print("Converting to Root file...")
-    os.system(f"netconvert --sumo-net-file={network_file} --plain-output-prefix={root_file}")
+    os.system(f"netconvert --sumo-net-file={network_file} --plain-output-prefix={root_file} --no-warnings=true")
 
     # convert nodes xml to dataframe
     def parse_nodes():
@@ -109,6 +89,9 @@ def visualize_plot(network_file, travel_edges, network_files_directory = "networ
             route_G.add_edge(edges[edge][0], edges[edge][1])
         
         # Plot graph
+        nx.draw_networkx_edges(G, pos, edgelist=highlight_edges, edge_color='red', width=2)
+        nx.draw_networkx_nodes(G, pos, nodelist=highlight_nodes, node_color='red', node_size=300)
+
         pos = {node: nodes[node] for node in nodes}
         nx.draw(G, pos, with_labels=False, node_color='black', node_size=200, edge_color='gray')
         nx.draw(route_G, pos, with_labels=False, node_color='green', node_size=300, edge_color='green', width = 2)
