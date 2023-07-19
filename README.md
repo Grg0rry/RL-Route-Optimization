@@ -167,5 +167,3 @@ def step(self, action, state_list, edge_list):
     bonus_reward = ((self.best_result-current_result)/self.best_result)*100 + 50
     continue_reward = 0
 ```
-
-
