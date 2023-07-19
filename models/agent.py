@@ -26,11 +26,20 @@ class rl_agent():
 
 
     def step(self, action, state_list, edge_list):
-        # initialize var
+        # initialize step
         terminate = False
-        reward = 0
         current_state = state_list[-1]
         current_edge = edge_list[-1] if edge_list else None
+
+        # reward paramaters -- **change values here**
+        invalid_action_reward = -50
+        dead_end_reward = -50
+        loop_reward = -50
+        # loop_reward = -30
+        completion_reward = 50
+        bonus_reward = 50 
+        # bonus_reward = ((self.best_result-current_result)/self.best_result)*100 + 50
+        continue_reward = 0
 
         # Get list of outgoing edges     
         outgoing_edges = self.env.decode_node_to_edges(current_state, direction = 'outgoing')
@@ -38,7 +47,7 @@ class rl_agent():
         # Compute reward and next state
         # Out-Of-Bound Action
         if action not in self.env.decode_edges_to_actions(outgoing_edges):
-            reward -= 100
+            reward += invalid_action_reward
             next_state = current_state
             next_edge = current_edge
 
@@ -46,44 +55,32 @@ class rl_agent():
         else:
             next_edge = self.env.decode_edges_action_to_edge(outgoing_edges, action)
             next_state = self.env.decode_edge_to_node(next_edge, direction = 'end')
+            reward = continue_reward
 
             # Completed Route
             if next_state in self.env.end_node:
-                reward += 100
+                reward += completion_reward
                 terminate = True
 
-                # evalution mode
-                # Check if its the shortest distance route
+                # check if the route is the shortest distance/time
                 if self.env.evaluation in ("distance", "d"):
-                    current_distance = self.env.get_edge_distance(edge_list + [next_edge])
-                    if self.best_result == 0:
-                        self.best_result = current_distance
-                    elif current_distance < self.best_result:
-                        for edge in edge_list:
-                            state_index = self.env.state_space.index(self.env.decode_edge_to_node(edge, direction = 'start'))
-                            action_index = self.env.edge_label[edge]
-                            self.q_table[state_index][action_index] += 100
-                        self.best_result = current_distance
-                
-                # Check if its the shortest time route
+                    current_result = self.env.get_edge_distance(edge_list + [next_edge])
                 else:
-                    current_time = self.env.get_edge_time(edge_list + [next_edge])
-                    if self.best_result == 0:
-                        self.best_result = current_time
-                    elif current_time < self.best_result:
-                        # print(f'edges: {edge_list + [next_edge]}, time: {current_time}, last pb: {self.best_result}')
-                        for edge in edge_list:
-                            state_index = self.env.state_space.index(self.env.decode_edge_to_node(edge, direction = 'start'))
-                            action_index = self.env.edge_label[edge]
-                            self.q_table[state_index][action_index] += 100
-                        self.best_result = current_time
-                    # print(f'edges: {edge_list + [next_edge]}, time: {current_time}')
-                    # print(f'best time: {self.best_result}')
+                    current_result = self.env.get_edge_time(edge_list + [next_edge])
 
+                # evaluation
+                if self.best_result == 0:
+                    self.best_result = current_result
+                elif current_result < self.best_result:
+                    for edge in edge_list:
+                        state_index = self.env.state_space.index(self.env.decode_edge_to_node(edge, direction = 'start'))
+                        action_index = self.env.edge_label[edge]
+                        self.q_table[state_index][action_index] += bonus_reward
+                    self.best_result = current_result
 
             # Dead-end Route
             elif not self.env.decode_node_to_edges(next_state, direction = 'outgoing'):
-                reward -= 100
+                reward += dead_end_reward
                 terminate = True
 
                 # Backtrack and find bottleneck
@@ -93,17 +90,13 @@ class rl_agent():
 
                     state_index = self.env.state_space.index(self.env.decode_edge_to_node(edge, direction = 'start'))
                     action_index = self.env.edge_label[edge]
-                    self.q_table[state_index][action_index] -= 100
+                    self.q_table[state_index][action_index] += dead_end_reward
             
             # Travelling
             elif current_edge != None:
-                if current_edge.replace("-", "") == next_edge.replace("-", ""): # prevent going backwards
-                    reward -= 0
                 if (current_edge, next_edge) in [(edge_list[i], edge_list[i+1]) for i in range(len(edge_list)-1)]: # Check if its in a loop
-                    reward -= 50
+                    reward += loop_reward
 
-        # print(f'current edge: {current_edge}, action: {action}, reward: {reward}, next edge: {next_edge}')
-        # print(self.q_table[self.env.state_space.index(next_state)])
         return next_edge, next_state, reward, terminate
 
 
@@ -113,7 +106,7 @@ class rl_agent():
         q_target = reward + self.discount_factor * np.max(self.q_table[self.env.state_space.index(next_state)])
         self.q_table[self.env.state_space.index(current_state)][action] += self.learning_rate * (q_target - q_predict)
 
-    
+
     def train(self, num_episodes, threshold):
         start_time = datetime.datetime.now() # time the training process
         self.reset()
@@ -144,11 +137,12 @@ class rl_agent():
 
             # Append to logs and print after every episode
             self.logs[episode] = [state_journey, edge_journey]
+            
             # print(f'{episode}: {self.logs[episode]}')
 
             # Compute Convergence
             if episode > threshold and self.logs[episode][0][-1] == self.env.end_node:
-                
+
                 # Convergence when 5 consecutive same routes produced
                 threshold_lst = list(self.logs.values())[-threshold:]
                 if all(x == threshold_lst[0] for x in threshold_lst):
@@ -171,6 +165,10 @@ class rl_agent():
             # Unable to converge
             if episode+1 == num_episodes:
                 print('Training Completed...')
+                end_time = datetime.datetime.now()
+                time_difference = end_time - start_time
+                processing_seconds = time_difference.total_seconds()
+                print(f'-- Processing Time: {processing_seconds} seconds')
                 sys.exit(f'Couldnt find shortest path with {num_episodes} episodes')
 
 

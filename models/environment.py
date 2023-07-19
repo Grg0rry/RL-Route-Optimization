@@ -3,10 +3,11 @@ import sumolib
 import math
 import networkx as nx
 import matplotlib.pyplot as plt
+import random
 
 
 class traffic_env:
-    def __init__ (self, network_file, congested = [], traffic_light = [], evaluation = "", travel_speed = 80):
+    def __init__ (self, network_file, congested = [], traffic_light = [], evaluation = "", congestion_level = "", travel_speed = 80):
         # Parameters 
         self.network_file = network_file
         self.net = sumolib.net.readNet(network_file)
@@ -17,19 +18,36 @@ class traffic_env:
         self.edge_label = self.decode_edges_to_label()
 
         # Define congestions edges
-        self.congested_edges = [item[0] for item in congested]
-        self.congestion_duration = [item[1] for item in congested]
-        for edge in self.congested_edges:
-            if edge not in self.edges:
-                sys.exit(f'The edge {edge} in congestion_edges provided does not exist')        
-        print(f'Congestion edges are: {self.congested_edges}')
-        
+        if congested:
+            self.congested_edges = [item[0] for item in congested]
+            self.congestion_duration = [item[1] for item in congested]
+            for edge in self.congested_edges:
+                if edge not in self.edges:
+                    sys.exit(f'The edge {edge} in congestion_edges provided does not exist') 
+            print(f'Congestion edges are: {self.congested_edges}')
+        else:
+            if congestion_level.lower() == "low":
+                traffic_level = 0.05
+            elif congestion_level.lower() == "medium":
+                traffic_level = 0.10
+            elif congestion_level.lower() == "high":
+                traffic_level = 0.20
+
+            self.congested_edges = random.sample(self.edges, round(len(self.edges) * traffic_level))
+            self.congestion_duration = [random.randint(10, 20) for i in range(len(self.congested_edges))]
+            print(f'traffic: {list(zip(self.congested_edges, self.congestion_duration))}')
+            print(f'num of congestions: {len(self.congested_edges)}, num of edges: {len(self.edges)}')
+
         # Define traffic lights nodes
         self.tl_nodes = [item[0] for item in traffic_light]
         self.tl_duration = [item[1] for item in traffic_light]
-        for node in self.tl_nodes:
-            if node not in self.nodes:
-                sys.exit(f'The node {node} in traffic_lights provided does not exist')
+
+        for nodes_lst in self.tl_nodes:
+            if isinstance(nodes_lst, str):
+                nodes_lst = [nodes_lst]
+            for node in nodes_lst:
+                if node not in self.nodes:
+                    sys.exit(f'The node {node} in traffic_lights provided does not exist')
         print(f'Traffic Light nodes are: {self.tl_nodes}')
 
         # Define evaluation type
@@ -279,15 +297,18 @@ class traffic_env:
             travel_edges = [travel_edges]
         
         # time punishment
-        for edge in travel_edges:
+        for i in range(len(travel_edges)):
             # congested area
-            if edge in self.congested_edges:
-                total_time += self.congestion_duration[self.congested_edges.index(edge)]
+            if travel_edges[i] in self.congested_edges:
+                total_time += self.congestion_duration[self.congested_edges.index(travel_edges[i])]
             
             # traffic light
-            node = self.decode_edge_to_node(edge, direction = 'end')
-            if node in self.tl_nodes:
-                total_time += self.tl_duration[self.tl_nodes.index(node)]
+            prev_node = self.decode_edge_to_node(travel_edges[i-1], direction = 'end') if i > 0 else ""
+            node = self.decode_edge_to_node(travel_edges[i], direction = 'end')
+
+            for index, search_nodes in enumerate(self.tl_nodes):
+                if node in search_nodes and prev_node not in search_nodes:
+                    total_time += self.tl_duration[index]
 
         return total_time
 
@@ -328,14 +349,45 @@ class traffic_env:
         route_G = nx.Graph()
         for edge in travel_edges:
             route_G.add_edge(edges_dict[edge][0], edges_dict[edge][1])
-        nx.draw(route_G, pos, with_labels=False, node_color='green', node_size=300, edge_color='green', width = 2)
+        nx.draw(route_G, pos, with_labels=False, node_color='green', node_size=300, edge_color='green', arrowsize = 15, arrows=True, arrowstyle='fancy')
 
         if self.evaluation in ("time", "t"):
             # Highlight traffic light nodes
-            nx.draw_networkx_nodes(G, pos, nodelist=self.tl_nodes, node_color='red', node_size=300)
+            tl_lst = []
+            for item in self.tl_nodes:
+                if isinstance(item, list):
+                    tl_lst.extend(item)
+                else:
+                    tl_lst.append(item)
+            nx.draw_networkx_nodes(G, pos, nodelist=tl_lst, node_color='red', node_size=300)
 
             # Highlight congestion edges
             congested_lst = [edges_dict[edge] for edge in self.congested_edges]
             nx.draw_networkx_edges(G, pos, edgelist=congested_lst, edge_color='red', width=2)
         
+        plt.show()
+
+
+    def plot_performance(self, num_episodes, logs):
+        """
+        Plotting of models' performance
+
+        Args:
+        - num_episodes (int): number of episodes it took for the model to converge.
+        - logs (dict): the logs of the edges and states it took to converge.
+
+        Return:
+        - Plot of the evaluation (time/distance) at each episode
+        """
+
+        if self.evaluation in ("distance", "d"):
+            plt.ylabel("Distance")
+            evaluation = [self.get_edge_distance(logs[episode][1]) for episode in range(num_episodes)]
+        else:
+            plt.ylabel("Time")
+            evaluation = [self.get_edge_time(logs[episode][1]) for episode in range(num_episodes)]
+
+        plt.plot(range(num_episodes), evaluation)
+        plt.xlabel("Episode")          
+        plt.title("Performance of Agent")
         plt.show()
