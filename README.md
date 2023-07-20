@@ -167,7 +167,7 @@ def step(self, action, state_list, edge_list):
 
 ```
 
-4. After adjustment, run the code in the terminal. [Follow Here]("#method-to-run)
+4. After adjustment, run the code in the terminal. [Follow Method to Run](#method-to-run)
 ```
 > python main.py
 ```
