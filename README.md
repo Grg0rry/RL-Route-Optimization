@@ -15,25 +15,25 @@ As there are multiple factors involved selecting the most optimal route, below a
 1. Comparision of the routes selected from the agent vs the baseline model (Dijkstra) 
 2. Evaluate if the models managed to converge
 3. Comparision of the number of episodes taken to converge (SARSA vs Q_Learning)
-4. Comparision on the time taken for the computation
+4. Comparision of the time taken for the computation
 
 ## Method to Run
 
 1. Download SUMO (https://sumo.dlr.de/docs/Downloads.php)
 2. Clone this repository to your local machine.
-3. Install the ncecessary packages
-```
+3. Install the necessary packages
+```python
 pip install -r requirements.txt
 ```
 4. Update the main.py with your SUMO directory to set the environment variable
-```
+```python
 def sumo_configuration():
     os.environ["SUMO_HOME"] = "D:/app/SUMO/SUMO/" # -- change to own directory
     ...
 ```
 5. Upload your netedit file and update the network_file variable
-```
-network_file = './network_files/fixed_network.net.xml'
+```python
+network_file = './network_files/2x3_network.net.xml'
 ```
 **More on Netedit:** https://sumo.dlr.de/docs/Netedit/index.html 
 
@@ -42,42 +42,40 @@ network_file = './network_files/fixed_network.net.xml'
 > python main.py
 ```
 
+## Test Cases
 
-## Test Case 1
-In test case 1, we check for the best settings for the reward function. Below is the different parameters was tuned to carry out the test case.
+### Test Case 1 - Ideal Reward Function
+In this test case, we examine the models' ability to converge and the number of episodes taken upon tuning and adjusting the reward function with different reward values.
 
-`main.py`
-```
+1. Set the network settings in `main.py` as the following:
+```python
 # 2x3 Traffic Network
-network_file = '<update with filepath of with 2x3 network netedit file>'
+network_file = './network_files/2x3_network.net.xml'
 ...
 start_node = "A"
 end_node = "N"
 
 # Sunway City traffic network
-network_file = '<update with filepath of Sunway City traffic network netedit file>'
+network_file = './network_files/sunway_network.net.xml'
 ...
 start_node = "101"
 end_node = "105"
 ```
 
-`agent.py`
-```
-# Default Reward Function
+2. Adjust the Reward Function accordingly in `agent.py`. Note to only edit within the reward parameters:
+```python
 def step(self, action, state_list, edge_list):
     ...
-    # reward paramaters
+
+    # Reward Function with Default Reward Function
     invalid_action_reward = -50
     dead_end_reward = -50
     loop_reward = -50
     completion_reward = 50
     bonus_reward = 50 
     continue_reward = 0
-
-# Reward Function with Reduced loop punishment
-def step(self, action, state_list, edge_list):
-    ...
-    # reward paramaters
+    
+    # Reward Function with Reduced loop punishment
     invalid_action_reward = -50
     dead_end_reward = -50
     loop_reward = -30
@@ -85,10 +83,7 @@ def step(self, action, state_list, edge_list):
     bonus_reward = 50 
     continue_reward = 0
 
-# Reward Function with Scaled bonus reward
-def step(self, action, state_list, edge_list):
-    ...
-    # reward paramaters
+    # Reward Function with Scaled bonus reward
     invalid_action_reward = -50
     dead_end_reward = -50
     loop_reward = -30
@@ -97,14 +92,18 @@ def step(self, action, state_list, edge_list):
     continue_reward = 0
 ```
 
-
-## Test Case 2
-In test case 2, we evaluate whether when the traffic density level increases, can the models still perform as expected.
-
-`main.py`
+3. After adjustment, run the code in the terminal. [Follow Here]("#method-to-run)
 ```
+> python main.py
+```
+
+### Test Case 2 - Traffic Density
+In this test case, we put the models to a stress test on their ability to maintain performance when the traffic density level increases.
+
+1. Adjust the network settings in `main.py` as the following:
+```python
 # Sunway City traffic network
-network_file = '<update with filepath of Sunway City traffic network netedit file>'
+network_file = './network_files/sunway_network.net.xml'
 
 # Sunway University to Taylors University
 start_node = "101"
@@ -119,6 +118,7 @@ start_node = "106"
 end_node = "104"
 ```
 
+2. Adjust the traffic density with the congestion level below:
 <details>
     <summary>
     Low Traffic Density
@@ -152,18 +152,34 @@ congestion = [('gne7248352139_1197884603', 11), ('gne1197879649_1197879633', 19)
 ```
 </details>
 
-</br>
-
-`agent.py`
-```
-# Reward Function with Scaled bonus reward
+3. Set the Reward Function in `agent.py` as the following. Note to only edit within the reward parameters:
+```python
 def step(self, action, state_list, edge_list):
     ...
-    # reward paramaters
+
+    # Reward Function with Scaled bonus reward
     invalid_action_reward = -50
     dead_end_reward = -50
     loop_reward = -30
     completion_reward = 50
-    bonus_reward = ((self.best_result-current_result)/self.best_result)*100 + 50
+    bonus_reward = 50 
     continue_reward = 0
+
+```
+
+4. After adjustment, run the code in the terminal. [Follow Here]("#method-to-run)
+```
+> python main.py
+```
+
+## Graph Plotting
+
+1. **Route Map**: In `main.py`, the function below maps the routes produced. 
+```python
+env.visualize_plot(edge_path)
+```
+
+2. **Performance Plot**: In `main.py`, the function below creates a line plot on the performance of each episode. This is also the learning curve of the model.
+```python
+env.plot_performance(number_of_episode, logs)
 ```
