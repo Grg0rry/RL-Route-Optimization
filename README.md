@@ -1,13 +1,13 @@
-# RL-Route-Optimization
+# Routing Optimization in Traffic Network using Reinforcement Learning
 
-Route Optimization algorithm that is used to find the most optimal route to travel with the starting and ending point selected.
+Traffic congestion remains a persistent problem in Malaysia, with Kuala Lumpur ranking as one of Asia's most congested cities. This issue leads to significant time delays, increased fuel consumption, and adverse environmental effects. Therefore, route optimisation is a promising solution that aims to guide drivers to take more efficient routes and enables them to reach their destinations quicker. 
 
-This study uses SUMO (more specifically the netedit file) to simulate the Road Network, with the agent as Reinforcement Learning models (SARSA and Q-Learning algorithms) to learn from the network environment and find the most optimal route.
+This study utilises reinforcement learning algorithms, specifically the `Temporal-Difference Learning` algorithm _(Q-Learning and SARSA)_, in computing the optimised routes with `SUMO` _(Netedit and Sumolib)_ to simulate the Traffic Network Environment. The `Numpy` library is used to construct the q-table used, and this program is coded in `Python` to orchestrate and run the simulator.
 
 ## Project Scope
 
-As there are multiple factors involved selecting the most optimal route, below are the factors that has been preset for this study:
-- Traffic network is not updated in real time with sudden abnormalities like accidents, weather changes, and natural disasters (floods, landslides, etc.)
+As there are multiple factors involved in selecting the most optimal route, below are the factors that have been preset for this study:
+- Traffic network is not updated in real-time with sudden abnormalities like accidents, weather changes, and natural disasters (floods, landslides, etc.)
 - Vehicle Speed is constant at 80 km/hr
 
 ## Method of Evaluation
