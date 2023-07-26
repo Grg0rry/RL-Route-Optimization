@@ -1,4 +1,5 @@
 import os, sys
+from matplotlib import pyplot as plt
 
 sys.path.append('models/')
 import environment
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     # [A, B, C, D, E, F, G, H, I, J, K, L, M, N]
     # -------------------
     network_file = './network_files/2x3_network.net.xml'
-    congested = [("gneF_I", 10), ("gneI_F", 10), ("gneB_E", 20), ("gneE_B", 20), ("gneJ_M", 30), ("gneM_J", 30)]
+    congestion = [("gneF_I", 10), ("gneI_F", 10), ("gneB_E", 20), ("gneE_B", 20), ("gneJ_M", 30), ("gneM_J", 30)]
     traffic_light = [("B", 5), ("I", 5), ("G", 5)]
     start_node = "A"
     end_node = "N"
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
 
     # 03 Initiate Environment
-    env = environment.traffic_env(network_file, congestion, traffic_light, evaluation = "t")
+    env = environment.traffic_env(network_file, congestion, traffic_light, evaluation = "d")
     # env = environment.traffic_env(network_file = network_file, traffic_light = traffic_light, evaluation = "t", congestion_level = "low")
     num_episodes = 5000
     num_converge = 5

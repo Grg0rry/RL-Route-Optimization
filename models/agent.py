@@ -31,18 +31,25 @@ class rl_agent():
         current_state = state_list[-1]
         current_edge = edge_list[-1] if edge_list else None
 
-        # reward paramaters -- **change values here**
+        # reward paramaters
+        # -------------------
+        # START OF EDIT
+        # -------------------
         invalid_action_reward = -50
         dead_end_reward = -50
-        loop_reward = -50
-        # loop_reward = -30
+        # loop_reward = -50
+        loop_reward = -30
         completion_reward = 50
         bonus_reward = 50 
         # bonus_reward = ((self.best_result-current_result)/self.best_result)*100 + 50
         continue_reward = 0
+        # -------------------
+        # END OF EDIT
+        # -------------------
 
         # Get list of outgoing edges     
         outgoing_edges = self.env.decode_node_to_edges(current_state, direction = 'outgoing')
+        reward = continue_reward
 
         # Compute reward and next state
         # Out-Of-Bound Action
@@ -55,7 +62,6 @@ class rl_agent():
         else:
             next_edge = self.env.decode_edges_action_to_edge(outgoing_edges, action)
             next_state = self.env.decode_edge_to_node(next_edge, direction = 'end')
-            reward = continue_reward
 
             # Completed Route
             if next_state in self.env.end_node:
