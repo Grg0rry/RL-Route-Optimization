@@ -37,7 +37,12 @@ network_file = './network_files/2x3_network.net.xml'
 ```
 **More on Netedit:** https://sumo.dlr.de/docs/Netedit/index.html 
 
-6. Run the code
+6. Edit to evaluate based on time or distance ("t" or "d")
+```python
+env = environment.traffic_env(network_file, congestion, traffic_light, evaluation = "d")
+```
+**More on Netedit:** https://sumo.dlr.de/docs/Netedit/index.html 
+7. Run the code
 ```
 > python main.py
 ```

@@ -1,5 +1,4 @@
 import os, sys
-from matplotlib import pyplot as plt
 
 sys.path.append('models/')
 import environment
